@@ -22,7 +22,16 @@
         <button onclick="startSharing()">Start Sharing Screen</button>
         <button onclick="resendOffer()" style="background: #28a745;">Resend Connection Request</button>
     </div>
-    <video id="localVideo" autoplay playsinline muted></video>
+    <div style="display: flex; gap: 20px; width: 100%; justify-content: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 300px; text-align: center;">
+            <h3>Your Screen (PC)</h3>
+            <video id="localVideo" autoplay playsinline muted style="width: 100%; border: 1px solid #333; background: #000;"></video>
+        </div>
+        <div style="flex: 1; min-width: 300px; text-align: center;">
+            <h3>Remote Android Screen</h3>
+            <video id="remoteVideo" autoplay playsinline style="width: 100%; border: 1px solid #CC0000; background: #000;"></video>
+        </div>
+    </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
@@ -33,6 +42,7 @@
         const socket = io();
         let peerConnection;
         let localStream;
+        const remoteVideo = document.getElementById('remoteVideo');
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
         async function startSharing() {
@@ -50,21 +60,49 @@
         }
 
         async function createPeerConnection(roomId) {
-            console.log("Setting up connection for room:", roomId);
+            console.log("[LAPTOP] Initializing RTCPeerConnection...");
             peerConnection = new RTCPeerConnection(config);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log("[LAPTOP] ICE Connection State:", peerConnection.iceConnectionState);
+            };
+
+            peerConnection.onicegatheringstatechange = () => {
+                console.log("[LAPTOP] ICE Gathering State:", peerConnection.iceGatheringState);
+            };
+
+            peerConnection.ontrack = (event) => {
+                console.log("[LAPTOP] RECEIVED REMOTE TRACK:", event.track.kind, "Streams:", event.streams.length);
+                const stream = event.streams[0] || new MediaStream([event.track]);
+                if (remoteVideo.srcObject !== stream) {
+                    console.log("[LAPTOP] Binding remote stream to video element");
+                    remoteVideo.srcObject = stream;
+                    // Ensure the video plays even if autoplay is restricted
+                    remoteVideo.play().catch(e => console.error("[LAPTOP] Play error:", e));
+                }
+            };
+
+            if (localStream) {
+                console.log("[LAPTOP] Adding local tracks to PeerConnection");
+                localStream.getTracks().forEach(track => {
+                    console.log("[LAPTOP] Adding track:", track.kind);
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
 
             const offer = await peerConnection.createOffer();
+            console.log("[LAPTOP] Created OFFER, setting local description");
             await peerConnection.setLocalDescription(offer);
 
             socket.emit("message", {
                 roomId,
                 offer: { sdp: offer.sdp, type: offer.type }
             });
-            console.log("OFFER sent to Android");
+            console.log("[LAPTOP] OFFER sent to server for Android");
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
+                    console.log("[LAPTOP] LOCAL ICE CANDIDATE gathered:", event.candidate.candidate.substring(0, 30));
                     socket.emit("message", { roomId, candidate: event.candidate });
                 }
             };
@@ -86,10 +124,44 @@
         });
 
         socket.on("message", async (data) => {
-            if (data.answer) {
-                console.log("Received ANSWER from Android");
+            if (data.offer) {
+                console.log("[LAPTOP] RECEIVED OFFER from Android");
+                if (!peerConnection) {
+                    console.log("[LAPTOP] PeerConnection missing, creating now...");
+                    await createPeerConnection(data.roomId);
+                } else if (peerConnection.signalingState !== "stable") {
+                    // Signaling collision detected!
+                    // Laptop is the "polite" peer and will rollback its own offer to accept the phone's.
+                    console.log("[LAPTOP] Signaling collision - rolling back to accept Android offer");
+                    await Promise.all([
+                        peerConnection.setLocalDescription({type: "rollback"}),
+                        peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+                    ]);
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.emit("message", {
+                        roomId: data.roomId,
+                        answer: { sdp: answer.sdp, type: answer.type }
+                    });
+                    console.log("[LAPTOP] Rolled back and sent ANSWER to Android");
+                    return;
+                }
+
+                console.log("[LAPTOP] Setting Remote Description from Android Offer");
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConnection.createAnswer();
+                console.log("[LAPTOP] Created ANSWER, setting local description");
+                await peerConnection.setLocalDescription(answer);
+                socket.emit("message", {
+                    roomId: data.roomId,
+                    answer: { sdp: answer.sdp, type: answer.type }
+                });
+                console.log("[LAPTOP] Sent ANSWER to Android");
+            } else if (data.answer) {
+                console.log("[LAPTOP] RECEIVED ANSWER from Android, setting Remote Description");
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             } else if (data.candidate && peerConnection) {
+                // console.log("[LAPTOP] RECEIVED ICE CANDIDATE from Android");
                 await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         });
