@@ -24,7 +24,8 @@ io.on("connection", (socket) => {
 
     socket.on("join", (roomId) => {
         socket.join(roomId);
-        console.log(`[ROOM] Device ${socket.id} joined room: ${roomId}`);
+        const clients = io.sockets.adapter.rooms.get(roomId);
+        console.log(`[ROOM] ${socket.id} joined ${roomId}. Total peers: ${clients ? clients.size : 0}`);
 
         // Notify others that a new peer joined (helps trigger offer)
         socket.to(roomId).emit("new-peer", { id: socket.id });

@@ -43,7 +43,33 @@
         let peerConnection;
         let localStream;
         const remoteVideo = document.getElementById('remoteVideo');
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const config = {
+          iceServers: [
+              {
+                urls: "stun:stun.relay.metered.ca:80",
+              },
+              {
+                urls: "turn:global.relay.metered.ca:80",
+                username: "34833bb06b286b22f6474760",
+                credential: "uT2D7UTml/31g90E",
+              },
+              {
+                urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                username: "34833bb06b286b22f6474760",
+                credential: "uT2D7UTml/31g90E",
+              },
+              {
+                urls: "turn:global.relay.metered.ca:443",
+                username: "34833bb06b286b22f6474760",
+                credential: "uT2D7UTml/31g90E",
+              },
+              {
+                urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                username: "34833bb06b286b22f6474760",
+                credential: "uT2D7UTml/31g90E",
+              },
+          ],
+        };
 
         async function startSharing() {
             const roomId = document.getElementById('roomId').value;
