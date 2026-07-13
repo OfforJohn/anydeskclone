@@ -42,6 +42,7 @@
         const socket = io();
         let peerConnection;
         let localStream;
+        let pendingIceCandidates = [];
         const remoteVideo = document.getElementById('remoteVideo');
         const config = {
           iceServers: [
@@ -153,8 +154,8 @@
         }
 
         socket.on("new-peer", () => {
-            console.log("A new device joined! Auto-resending offer...");
-            resendOffer();
+            console.log("A new device joined!");
+            // resendOffer() removed to avoid redundant negotiation cycles
         });
 
         socket.on("message", async (data) => {
@@ -164,8 +165,6 @@
                     console.log("[LAPTOP] PeerConnection missing, creating now...");
                     await createPeerConnection(data.roomId);
                 } else if (peerConnection.signalingState !== "stable") {
-                    // Signaling collision detected!
-                    // Laptop is the "polite" peer and will rollback its own offer to accept the phone's.
                     console.log("[LAPTOP] Signaling collision - rolling back to accept Android offer");
                     await Promise.all([
                         peerConnection.setLocalDescription({type: "rollback"}),
@@ -177,28 +176,42 @@
                         roomId: data.roomId,
                         answer: { sdp: answer.sdp, type: answer.type }
                     });
-                    console.log("[LAPTOP] Rolled back and sent ANSWER to Android");
+                    processPendingIceCandidates();
                     return;
                 }
 
-                console.log("[LAPTOP] Setting Remote Description from Android Offer");
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await peerConnection.createAnswer();
-                console.log("[LAPTOP] Created ANSWER, setting local description");
                 await peerConnection.setLocalDescription(answer);
                 socket.emit("message", {
                     roomId: data.roomId,
                     answer: { sdp: answer.sdp, type: answer.type }
                 });
-                console.log("[LAPTOP] Sent ANSWER to Android");
+                processPendingIceCandidates();
             } else if (data.answer) {
-                console.log("[LAPTOP] RECEIVED ANSWER from Android, setting Remote Description");
+                console.log("[LAPTOP] RECEIVED ANSWER from Android");
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-            } else if (data.candidate && peerConnection) {
-                // console.log("[LAPTOP] RECEIVED ICE CANDIDATE from Android");
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                processPendingIceCandidates();
+            } else if (data.candidate) {
+                if (peerConnection && peerConnection.remoteDescription) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                } else {
+                    console.log("[LAPTOP] Buffering ICE candidate (remoteDescription not set)");
+                    pendingIceCandidates.push(data.candidate);
+                }
             }
         });
+
+        function processPendingIceCandidates() {
+            if (peerConnection && peerConnection.remoteDescription) {
+                console.log(`[LAPTOP] Processing ${pendingIceCandidates.length} pending ICE candidates`);
+                pendingIceCandidates.forEach(candidate => {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+                        .catch(e => console.error("[LAPTOP] Error adding buffered ICE candidate", e));
+                });
+                pendingIceCandidates = [];
+            }
+        }
 
         socket.on("connect", () => console.log("Connected to signaling server"));
     </script>
