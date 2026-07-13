@@ -89,8 +89,16 @@
             console.log("[LAPTOP] Initializing RTCPeerConnection...");
             peerConnection = new RTCPeerConnection(config);
 
+            peerConnection.onicecandidateerror = (e) => {
+                console.error("ICE ERROR", e.errorCode, e.errorText, e.url);
+            };
+
             peerConnection.oniceconnectionstatechange = () => {
                 console.log("[LAPTOP] ICE Connection State:", peerConnection.iceConnectionState);
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                console.log("[LAPTOP] Connection State:", peerConnection.connectionState);
             };
 
             peerConnection.onicegatheringstatechange = () => {
@@ -128,7 +136,7 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    console.log("[LAPTOP] LOCAL ICE CANDIDATE gathered:", event.candidate.candidate.substring(0, 30));
+                    console.log("[LAPTOP] ICE CANDIDATE:", event.candidate.candidate);
                     socket.emit("message", { roomId, candidate: event.candidate });
                 }
             };
