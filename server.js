@@ -8,11 +8,10 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"],
-    credentials: true
+    methods: ["GET", "POST"]
   },
   allowEIO3: true,
-  transports: ['websocket']
+  transports: ['websocket', 'polling']
 });
 
 app.get('/', (req, res) => {

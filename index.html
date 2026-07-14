@@ -39,10 +39,32 @@
             document.getElementById('security-warning').style.display = 'block';
         }
 
-        const socket = io();
+        const socket = io({
+            transports: ['websocket']
+        });
         let peerConnection;
+        let dataChannel;
         let localStream;
         const remoteVideo = document.getElementById('remoteVideo');
+
+        // Handle clicks on remote video to send control events
+        remoteVideo.addEventListener('click', (e) => {
+            if (!dataChannel || dataChannel.readyState !== 'open') return;
+
+            const rect = remoteVideo.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+
+            const clickEvent = {
+                type: 'click',
+                x: x,
+                y: y
+            };
+
+            dataChannel.send(JSON.stringify(clickEvent));
+            console.log("[LAPTOP] Sent click event:", clickEvent);
+        });
+
         const config = {
           iceServers: [
               {
@@ -50,23 +72,23 @@
               },
               {
                 urls: "turn:global.relay.metered.ca:80",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
               {
                 urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
               {
                 urls: "turn:global.relay.metered.ca:443",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
               {
                 urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
           ],
         };
@@ -88,6 +110,16 @@
         async function createPeerConnection(roomId) {
             console.log("[LAPTOP] Initializing RTCPeerConnection...");
             peerConnection = new RTCPeerConnection(config);
+
+            // Create Data Channel for control
+            dataChannel = peerConnection.createDataChannel("control");
+            dataChannel.onopen = () => console.log("[LAPTOP] Control DataChannel OPEN");
+            dataChannel.onclose = () => console.log("[LAPTOP] Control DataChannel CLOSED");
+
+            peerConnection.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                dataChannel.onmessage = (e) => console.log("[LAPTOP] DataChannel Message:", e.data);
+            };
 
             peerConnection.oniceconnectionstatechange = () => {
                 console.log("[LAPTOP] ICE Connection State:", peerConnection.iceConnectionState);
