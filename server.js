@@ -12,7 +12,7 @@ const io = new Server(server, {
     credentials: true
   },
   allowEIO3: true,
-  transports: ['polling', 'websocket']
+  transports: ['websocket']
 });
 
 app.get('/', (req, res) => {
@@ -25,22 +25,23 @@ io.on("connection", (socket) => {
     socket.on("join", (roomId) => {
         socket.join(roomId);
         const clients = io.sockets.adapter.rooms.get(roomId);
-        console.log(`[ROOM] ${socket.id} joined ${roomId}. Total peers: ${clients ? clients.size : 0}`);
+        const peerCount = clients ? clients.size : 0;
+        console.log(`[ROOM] ${socket.id} joined ${roomId}. Total peers: ${peerCount}`);
 
-        // Notify others that a new peer joined (helps trigger offer)
-        socket.to(roomId).emit("new-peer", { id: socket.id });
+        // Only notify if it's not the first peer to avoid "glare" (offer collision)
+        if (peerCount > 1) {
+            socket.to(roomId).emit("new-peer", { id: socket.id });
+        }
     });
 
     socket.on("message", (data) => {
         const type = data.offer ? "OFFER" : data.answer ? "ANSWER" : "CANDIDATE";
         console.log(`[MSG] Forwarding ${type} from ${socket.id} to room ${data.roomId}`);
-
-        // Broadcast to everyone else in the room
         socket.to(data.roomId).emit("message", data);
     });
 
-    socket.on("disconnect", () => {
-        console.log(`[DISCONN] Device ${socket.id} disconnected`);
+    socket.on("disconnect", (reason) => {
+        console.log(`[DISCONN] Device ${socket.id} disconnected. Reason: ${reason}`);
     });
 });
 
