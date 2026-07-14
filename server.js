@@ -12,7 +12,7 @@ const io = new Server(server, {
     credentials: true
   },
   allowEIO3: true,
-  transports: ['polling', 'websocket']
+  transports: ['websocket']
 });
 
 app.get('/', (req, res) => {
@@ -20,12 +20,14 @@ app.get('/', (req, res) => {
 });
 
 io.on("connection", (socket) => {
-    console.log(`[CONN] New device connected: ${socket.id}`);
+    const transport = socket.conn.transport.name;
+    console.log(`[CONN] New device connected: ${socket.id} (Transport: ${transport})`);
 
     socket.on("join", (roomId) => {
         socket.join(roomId);
         const clients = io.sockets.adapter.rooms.get(roomId);
-        console.log(`[ROOM] ${socket.id} joined ${roomId}. Total peers: ${clients ? clients.size : 0}`);
+        const peerCount = clients ? clients.size : 0;
+        console.log(`[ROOM] ${socket.id} joined ${roomId}. Total peers now: ${peerCount}`);
 
         // Notify others that a new peer joined (helps trigger offer)
         socket.to(roomId).emit("new-peer", { id: socket.id });
@@ -33,14 +35,17 @@ io.on("connection", (socket) => {
 
     socket.on("message", (data) => {
         const type = data.offer ? "OFFER" : data.answer ? "ANSWER" : "CANDIDATE";
-        console.log(`[MSG] Forwarding ${type} from ${socket.id} to room ${data.roomId}`);
+        let detail = "";
+        if (data.candidate) detail = `(${data.candidate.candidate.substring(0, 40)}...)`;
+
+        console.log(`[MSG] [${data.roomId}] Forwarding ${type} from ${socket.id} ${detail}`);
 
         // Broadcast to everyone else in the room
         socket.to(data.roomId).emit("message", data);
     });
 
-    socket.on("disconnect", () => {
-        console.log(`[DISCONN] Device ${socket.id} disconnected`);
+    socket.on("disconnect", (reason) => {
+        console.log(`[DISCONN] Device ${socket.id} disconnected. Reason: ${reason}`);
     });
 });
 

@@ -50,23 +50,23 @@
               },
               {
                 urls: "turn:global.relay.metered.ca:80",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
               {
                 urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
               {
                 urls: "turn:global.relay.metered.ca:443",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
               {
                 urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "34833bb06b286b22f6474760",
-                credential: "uT2D7UTml/31g90E",
+                username: "d96b37d0e903f99258135973",
+                credential: "1lHMKzPiNxyHbls9",
               },
           ],
         };
@@ -86,15 +86,30 @@
         }
 
         async function createPeerConnection(roomId) {
-            console.log("[LAPTOP] Initializing RTCPeerConnection...");
+            console.log("[LAPTOP] Initializing RTCPeerConnection with config:", config);
             peerConnection = new RTCPeerConnection(config);
 
             peerConnection.oniceconnectionstatechange = () => {
-                console.log("[LAPTOP] ICE Connection State:", peerConnection.iceConnectionState);
+                console.log("[LAPTOP] ICE Connection State Changed:", peerConnection.iceConnectionState);
+                if (peerConnection.iceConnectionState === "failed") {
+                    console.error("[LAPTOP] ICE Connection FAILED. This usually means TURN/STUN failed to bypass the firewall.");
+                }
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                console.log("[LAPTOP] Peer Connection State:", peerConnection.connectionState);
+            };
+
+            peerConnection.onsignalingstatechange = () => {
+                console.log("[LAPTOP] Signaling State:", peerConnection.signalingState);
             };
 
             peerConnection.onicegatheringstatechange = () => {
                 console.log("[LAPTOP] ICE Gathering State:", peerConnection.iceGatheringState);
+            };
+
+            peerConnection.onicecandidateerror = (event) => {
+                console.error("[LAPTOP] ICE Candidate Error! URL:", event.url, "Error Code:", event.errorCode, "Text:", event.errorText);
             };
 
             peerConnection.ontrack = (event) => {
@@ -128,7 +143,14 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    console.log("[LAPTOP] LOCAL ICE CANDIDATE gathered:", event.candidate.candidate.substring(0, 30));
+                    const parts = event.candidate.candidate.split(' ');
+                    const type = parts[7]; // candidate type is usually the 8th field
+                    console.log(`[LAPTOP] LOCAL ICE CANDIDATE gathered (${type}):`, event.candidate.candidate.substring(0, 50) + "...");
+
+                    if (type === "relay") {
+                        console.log("[LAPTOP] SUCCESS: Found a RELAY candidate (TURN server is working)");
+                    }
+
                     socket.emit("message", { roomId, candidate: event.candidate });
                 }
             };
@@ -145,8 +167,11 @@
         }
 
         socket.on("new-peer", () => {
-            console.log("A new device joined! Auto-resending offer...");
-            resendOffer();
+            console.log("A new device joined!");
+            if (localStream) {
+                console.log("I am already sharing. Sending offer to new peer...");
+                resendOffer();
+            }
         });
 
         socket.on("message", async (data) => {
