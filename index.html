@@ -39,7 +39,9 @@
             document.getElementById('security-warning').style.display = 'block';
         }
 
-        const socket = io();
+        const socket = io({
+            transports: ['websocket']
+        });
         let peerConnection;
         let localStream;
         let pendingIceCandidates = [];
