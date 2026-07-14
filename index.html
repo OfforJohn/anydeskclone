@@ -39,12 +39,9 @@
             document.getElementById('security-warning').style.display = 'block';
         }
 
-        const socket = io({
-            transports: ['websocket']
-        });
+        const socket = io();
         let peerConnection;
         let localStream;
-        let pendingIceCandidates = [];
         const remoteVideo = document.getElementById('remoteVideo');
         const config = {
           iceServers: [
@@ -92,13 +89,6 @@
             console.log("[LAPTOP] Initializing RTCPeerConnection...");
             peerConnection = new RTCPeerConnection(config);
 
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    console.log("[LAPTOP] LOCAL ICE CANDIDATE gathered:", event.candidate.candidate.substring(0, 30));
-                    socket.emit("message", { roomId, candidate: event.candidate });
-                }
-            };
-
             peerConnection.oniceconnectionstatechange = () => {
                 console.log("[LAPTOP] ICE Connection State:", peerConnection.iceConnectionState);
             };
@@ -125,6 +115,23 @@
                     peerConnection.addTrack(track, localStream);
                 });
             }
+
+            const offer = await peerConnection.createOffer();
+            console.log("[LAPTOP] Created OFFER, setting local description");
+            await peerConnection.setLocalDescription(offer);
+
+            socket.emit("message", {
+                roomId,
+                offer: { sdp: offer.sdp, type: offer.type }
+            });
+            console.log("[LAPTOP] OFFER sent to server for Android");
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log("[LAPTOP] LOCAL ICE CANDIDATE gathered:", event.candidate.candidate.substring(0, 30));
+                    socket.emit("message", { roomId, candidate: event.candidate });
+                }
+            };
         }
 
         async function resendOffer() {
@@ -138,8 +145,8 @@
         }
 
         socket.on("new-peer", () => {
-            console.log("A new device joined! Waiting for them to send an offer first...");
-            // Manual resend is available via the green button if needed.
+            console.log("A new device joined! Auto-resending offer...");
+            resendOffer();
         });
 
         socket.on("message", async (data) => {
@@ -163,7 +170,6 @@
                         answer: { sdp: answer.sdp, type: answer.type }
                     });
                     console.log("[LAPTOP] Rolled back and sent ANSWER to Android");
-                    processPendingIceCandidates();
                     return;
                 }
 
@@ -177,31 +183,14 @@
                     answer: { sdp: answer.sdp, type: answer.type }
                 });
                 console.log("[LAPTOP] Sent ANSWER to Android");
-                processPendingIceCandidates();
             } else if (data.answer) {
                 console.log("[LAPTOP] RECEIVED ANSWER from Android, setting Remote Description");
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                processPendingIceCandidates();
             } else if (data.candidate && peerConnection) {
-                if (peerConnection.remoteDescription) {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                } else {
-                    console.log("[LAPTOP] Buffering ICE candidate (remoteDescription not set)");
-                    pendingIceCandidates.push(data.candidate);
-                }
+                // console.log("[LAPTOP] RECEIVED ICE CANDIDATE from Android");
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         });
-
-        function processPendingIceCandidates() {
-            if (peerConnection && peerConnection.remoteDescription) {
-                console.log(`[LAPTOP] Processing ${pendingIceCandidates.length} pending ICE candidates`);
-                pendingIceCandidates.forEach(candidate => {
-                    peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
-                        .catch(e => console.error("[LAPTOP] Error adding buffered ICE candidate", e));
-                });
-                pendingIceCandidates = [];
-            }
-        }
 
         socket.on("connect", () => console.log("Connected to signaling server"));
     </script>
