@@ -138,8 +138,8 @@
         }
 
         socket.on("new-peer", () => {
-            console.log("A new device joined! Auto-resending offer...");
-            resendOffer();
+            console.log("A new device joined! Waiting for them to send an offer first...");
+            // Manual resend is available via the green button if needed.
         });
 
         socket.on("message", async (data) => {
