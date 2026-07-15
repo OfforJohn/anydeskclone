@@ -111,13 +111,11 @@
             console.log("[LAPTOP] Initializing RTCPeerConnection...");
             peerConnection = new RTCPeerConnection(config);
 
-            // Create Data Channel for control
-            dataChannel = peerConnection.createDataChannel("control");
-            dataChannel.onopen = () => console.log("[LAPTOP] Control DataChannel OPEN");
-            dataChannel.onclose = () => console.log("[LAPTOP] Control DataChannel CLOSED");
-
             peerConnection.ondatachannel = (event) => {
+                console.log("[LAPTOP] DataChannel RECEIVED from Android");
                 dataChannel = event.channel;
+                dataChannel.onopen = () => console.log("[LAPTOP] Control DataChannel OPEN");
+                dataChannel.onclose = () => console.log("[LAPTOP] Control DataChannel CLOSED");
                 dataChannel.onmessage = (e) => console.log("[LAPTOP] DataChannel Message:", e.data);
             };
 
