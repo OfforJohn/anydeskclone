@@ -168,11 +168,13 @@
 
         async function resendOffer() {
             const roomId = document.getElementById('roomId').value;
-            if (peerConnection) {
+            if (peerConnection && peerConnection.signalingState === "stable") {
+                console.log("[LAPTOP] Renegotiating: Creating new offer...");
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 socket.emit("message", { roomId, offer: { sdp: offer.sdp, type: offer.type } });
-                console.log("RESENT OFFER to Android");
+            } else {
+                console.log("[LAPTOP] resendOffer ignored - already in state:", peerConnection?.signalingState);
             }
         }
 
@@ -219,8 +221,12 @@
                 });
                 console.log("[LAPTOP] Sent ANSWER to Android");
             } else if (data.answer) {
-                console.log("[LAPTOP] RECEIVED ANSWER from Android, setting Remote Description");
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                if (peerConnection.signalingState === "have-local-offer") {
+                    console.log("[LAPTOP] RECEIVED ANSWER from Android, setting Remote Description");
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                } else {
+                    console.warn("[LAPTOP] Received ANSWER but signaling state is:", peerConnection.signalingState, "- ignoring");
+                }
             } else if (data.candidate && peerConnection) {
                 // console.log("[LAPTOP] RECEIVED ICE CANDIDATE from Android");
                 await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
