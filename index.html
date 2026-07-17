@@ -1,237 +1,437 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>PC Screen Sender</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnyDesk Remote | Control Center</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .controls { margin-bottom: 20px; }
-        video { width: 80%; border: 2px solid #333; background: #000; }
-        input { padding: 10px; margin: 5px; }
-        button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
-        .error { color: red; font-weight: bold; margin: 10px; }
+        :root {
+            --primary-accent: #E94560;
+            --hover-accent: #ff4d6d;
+            --bg-dark: #0F0F0F;
+            --card-bg: #1A1A1A;
+            --text-main: #FFFFFF;
+            --text-dim: #AAAAAA;
+            --border-color: #333333;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        header {
+            background-color: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .logo i { font-size: 1.5rem; }
+
+        #setup-screen {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(15px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+
+        .setup-card {
+            background: rgba(26, 26, 26, 0.9);
+            padding: 40px;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .setup-card h2 { margin-top: 0; margin-bottom: 12px; font-weight: 700; }
+        .setup-card p { color: var(--text-dim); margin-bottom: 32px; font-size: 0.95rem; }
+
+        input {
+            width: 100%;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: white;
+            font-size: 1.2rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.3s;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        input:focus { border-color: white; background: rgba(255, 255, 255, 0.1); }
+
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            background: white;
+            color: black;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn-primary:hover { transform: scale(1.02); }
+
+        main {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 40px 150px 40px; /* Increased bottom padding significantly to move whole section up */
+            box-sizing: border-box;
+        }
+
+        .remote-container {
+            width: 100%;
+            height: 100%;
+            max-width: 1000px;
+            max-height: 78vh; /* Slightly smaller height to ensure the bottom isn't cut off */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><text y="24" style="font-size: 24px;">👆</text></svg>') 8 0, auto;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+            background: #000;
+            border: 12px solid #111;
+            border-radius: 40px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+        }
+
+        #dino-loader {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            z-index: 5;
+        }
+
+        .dino-track {
+            position: relative;
+            width: 300px;
+            height: 100px;
+            overflow: hidden;
+            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+        }
+
+        .scrolling-dino {
+            position: absolute;
+            font-size: 40px;
+            bottom: 5px;
+            animation: dino-scroll linear infinite;
+        }
+
+        .dino-1 { animation-duration: 3s; left: -50px; }
+        .dino-2 { animation-duration: 5s; left: -100px; animation-delay: 1s; }
+        .dino-3 { animation-duration: 4s; left: -150px; animation-delay: 0.5s; }
+
+        @keyframes dino-scroll {
+            from { transform: translateX(0); left: -50px; }
+            to { transform: translateX(400px); left: -50px; }
+        }
+
+        .waiting-text {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 20px;
+            right: 24px;
+            padding: 8px 16px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
+        .status-dot.active { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
+
+        .btn-refresh {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: all 0.2s;
+            font-size: 0.8rem;
+        }
+        .btn-refresh:hover { background: rgba(255, 255, 255, 0.2); }
+        .btn-refresh i { margin-right: 4px; }
     </style>
 </head>
 <body>
-    <h2>PC Screen Sender (WebRTC)</h2>
-    <div id="security-warning" class="error" style="display:none;">
-        ⚠️ ERROR: Your browser is blocking screen sharing because this page is not "Secure". <br>
-        Please use <b>http://localhost:3001</b> exactly.
-    </div>
-    <div class="controls">
-        <input type="text" id="roomId" placeholder="Meeting ID (e.g. 555)">
-        <button onclick="startSharing()">Start Sharing Screen</button>
-        <button onclick="resendOffer()" style="background: #28a745;">Resend Connection Request</button>
-    </div>
-    <div style="display: flex; gap: 20px; width: 100%; justify-content: center; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 300px; text-align: center;">
-            <h3>Your Screen (PC)</h3>
-            <video id="localVideo" autoplay playsinline muted style="width: 100%; border: 1px solid #333; background: #000;"></video>
+
+    <header>
+        <div class="logo">
+            <i class="fas fa-satellite-dish"></i>
+            <span>Control Center</span>
         </div>
-        <div style="flex: 1; min-width: 300px; text-align: center;">
-            <h3>Remote Android Screen</h3>
-            <video id="remoteVideo" autoplay playsinline style="width: 100%; border: 1px solid #CC0000; background: #000;"></video>
+        <div id="active-info" style="margin-left: auto; display: none;">
+            <span id="display-room-id" style="font-weight: 700; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 8px;">-</span>
+            <button class="btn-refresh" onclick="refreshConnection()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </header>
+
+    <div id="setup-screen">
+        <div class="setup-card">
+            <i class="fas fa-fingerprint" style="font-size: 3.5rem; color: white; margin-bottom: 24px;"></i>
+            <h2>Remote Access</h2>
+            <p>Enter the ID from your device to start the session.</p>
+            <input type="text" id="roomId" placeholder="ID" autocomplete="off">
+            <button class="btn-primary" onclick="startSharing()">Connect Now</button>
         </div>
     </div>
+
+    <main>
+        <div class="remote-container">
+            <div id="dino-loader" style="display: none;">
+                <div class="dino-track">
+                    <div class="scrolling-dino dino-1">🦖</div>
+                    <div class="scrolling-dino dino-2">🦕</div>
+                    <div class="scrolling-dino dino-3">🦖</div>
+                </div>
+                <div class="waiting-text">Waiting for device screen...</div>
+            </div>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+        <div class="status-badge">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">Ready</span>
+        </div>
+    </main>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            document.getElementById('security-warning').style.display = 'block';
-        }
-
-        const socket = io({
-            transports: ['websocket']
-        });
+        const socket = io({ transports: ['websocket'] });
         let peerConnection;
         let dataChannel;
-        let localStream;
         const remoteVideo = document.getElementById('remoteVideo');
+        const dinoLoader = document.getElementById('dino-loader');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const roomIdInput = document.getElementById('roomId');
 
-        // Handle clicks on remote video to send control events
-        remoteVideo.addEventListener('click', (e) => {
-            if (!dataChannel || dataChannel.readyState !== 'open') return;
+        // Load saved Room ID
+        const savedRoomId = localStorage.getItem('lastRoomId');
+        if (savedRoomId) {
+            roomIdInput.value = savedRoomId;
+        }
 
+        function updateStatus(status, isActive) {
+            statusText.innerText = status;
+            statusDot.className = 'status-dot' + (isActive ? ' active' : '');
+        }
+
+        let isMouseDown = false;
+        let startX, startY, startTime;
+
+        function getCoords(e) {
             const rect = remoteVideo.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width;
-            const y = (e.clientY - rect.top) / rect.height;
-
-            const clickEvent = {
-                type: 'click',
-                x: x,
-                y: y
+            const videoRatio = remoteVideo.videoWidth / remoteVideo.videoHeight || 1;
+            const elementRatio = rect.width / rect.height;
+            let actualWidth, actualHeight, offsetX, offsetY;
+            if (elementRatio > videoRatio) {
+                actualHeight = rect.height; actualWidth = actualHeight * videoRatio;
+                offsetX = (rect.width - actualWidth) / 2; offsetY = 0;
+            } else {
+                actualWidth = rect.width; actualHeight = actualWidth / videoRatio;
+                offsetX = 0; offsetY = (rect.height - actualHeight) / 2;
+            }
+            return {
+                x: (e.clientX - rect.left - offsetX) / actualWidth,
+                y: (e.clientY - rect.top - offsetY) / actualHeight
             };
+        }
 
-            dataChannel.send(JSON.stringify(clickEvent));
-            console.log("[LAPTOP] Sent click event:", clickEvent);
+        remoteVideo.addEventListener('mousedown', (e) => {
+            if (remoteVideo.style.display === 'none') return;
+            isMouseDown = true;
+            const coords = getCoords(e);
+            startX = coords.x; startY = coords.y; startTime = Date.now();
+            e.preventDefault();
         });
 
-        const config = {
-          iceServers: [
-              {
-                urls: "stun:stun.relay.metered.ca:80",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:80",
-                username: "d96b37d0e903f99258135973",
-                credential: "1lHMKzPiNxyHbls9",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "d96b37d0e903f99258135973",
-                credential: "1lHMKzPiNxyHbls9",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:443",
-                username: "d96b37d0e903f99258135973",
-                credential: "1lHMKzPiNxyHbls9",
-              },
-              {
-                urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "d96b37d0e903f99258135973",
-                credential: "1lHMKzPiNxyHbls9",
-              },
-          ],
-        };
+        remoteVideo.addEventListener('mouseup', (e) => {
+            if (!isMouseDown) return;
+            isMouseDown = false;
+            const coords = getCoords(e);
+            const duration = Date.now() - startTime;
+            const dist = Math.sqrt(Math.pow(coords.x - startX, 2) + Math.pow(coords.y - startY, 2));
 
-        async function startSharing() {
-            const roomId = document.getElementById('roomId').value;
-            if (!roomId) { alert("Please enter a Meeting ID"); return; }
-            socket.emit("join", roomId);
-
-            try {
-                localStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                document.getElementById('localVideo').srcObject = localStream;
-                await createPeerConnection(roomId);
-            } catch (err) {
-                console.error("Error sharing screen: ", err);
+            if (dataChannel && dataChannel.readyState === 'open') {
+                if (dist < 0.01) {
+                    dataChannel.send(JSON.stringify({ type: 'click', x: startX, y: startY }));
+                } else {
+                    dataChannel.send(JSON.stringify({
+                        type: 'swipe', x1: startX, y1: startY,
+                        x2: coords.x, y2: coords.y, duration: Math.max(duration, 100)
+                    }));
+                }
             }
+        });
+
+        remoteVideo.addEventListener('mouseleave', () => { isMouseDown = false; });
+
+        function startSharing() {
+            const roomId = roomIdInput.value;
+            if (!roomId) return;
+
+            // Save for next reload
+            localStorage.setItem('lastRoomId', roomId);
+
+            document.getElementById('setup-screen').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('setup-screen').style.display = 'none';
+                document.getElementById('active-info').style.display = 'block';
+                document.getElementById('display-room-id').innerText = roomId;
+                dinoLoader.style.display = 'flex';
+            }, 300);
+
+            socket.emit("join", roomId);
+            updateStatus("Connecting...", false);
+
+            // Initiate connection immediately to speed up
+            createPeerConnection(roomId);
         }
+
+        function refreshConnection() {
+            const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
+            if (!roomId) return;
+
+            console.log("Refreshing connection for room:", roomId);
+            updateStatus("Refreshing...", false);
+
+            // Clean up old connection
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            dataChannel = null;
+
+            // Reset UI
+            remoteVideo.style.display = 'none';
+            dinoLoader.style.display = 'flex';
+
+            // Re-join and re-initiate
+            socket.emit("join", roomId);
+            createPeerConnection(roomId);
+        }
+
+        const config = { iceServers: [
+            { urls: "stun:stun.relay.metered.ca:80" },
+            { urls: "turn:global.relay.metered.ca:80", username: "d96b37d0e903f99258135973", credential: "1lHMKzPiNxyHbls9" }
+        ]};
 
         async function createPeerConnection(roomId) {
-            console.log("[LAPTOP] Initializing RTCPeerConnection...");
+            if (peerConnection) return;
             peerConnection = new RTCPeerConnection(config);
-
             peerConnection.ondatachannel = (event) => {
-                console.log("[LAPTOP] DataChannel RECEIVED from Android");
                 dataChannel = event.channel;
-                dataChannel.onopen = () => console.log("[LAPTOP] Control DataChannel OPEN");
-                dataChannel.onclose = () => console.log("[LAPTOP] Control DataChannel CLOSED");
-                dataChannel.onmessage = (e) => console.log("[LAPTOP] DataChannel Message:", e.data);
+                dataChannel.onopen = () => updateStatus("Live Control", true);
             };
-
-            peerConnection.oniceconnectionstatechange = () => {
-                console.log("[LAPTOP] ICE Connection State:", peerConnection.iceConnectionState);
-            };
-
-            peerConnection.onicegatheringstatechange = () => {
-                console.log("[LAPTOP] ICE Gathering State:", peerConnection.iceGatheringState);
-            };
-
             peerConnection.ontrack = (event) => {
-                console.log("[LAPTOP] RECEIVED REMOTE TRACK:", event.track.kind, "Streams:", event.streams.length);
-                const stream = event.streams[0] || new MediaStream([event.track]);
-                if (remoteVideo.srcObject !== stream) {
-                    console.log("[LAPTOP] Binding remote stream to video element");
-                    remoteVideo.srcObject = stream;
-                    // Ensure the video plays even if autoplay is restricted
-                    remoteVideo.play().catch(e => console.error("[LAPTOP] Play error:", e));
-                }
+                remoteVideo.srcObject = event.streams[0] || new MediaStream([event.track]);
+                remoteVideo.style.display = 'block';
+                dinoLoader.style.display = 'none';
             };
 
-            if (localStream) {
-                console.log("[LAPTOP] Adding local tracks to PeerConnection");
-                localStream.getTracks().forEach(track => {
-                    console.log("[LAPTOP] Adding track:", track.kind);
-                    peerConnection.addTrack(track, localStream);
-                });
-            }
-
-            const offer = await peerConnection.createOffer();
-            console.log("[LAPTOP] Created OFFER, setting local description");
+            const offer = await peerConnection.createOffer({ offerToReceiveVideo: true });
             await peerConnection.setLocalDescription(offer);
-
-            socket.emit("message", {
-                roomId,
-                offer: { sdp: offer.sdp, type: offer.type }
-            });
-            console.log("[LAPTOP] OFFER sent to server for Android");
+            socket.emit("message", { roomId, offer });
 
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    console.log("[LAPTOP] LOCAL ICE CANDIDATE gathered:", event.candidate.candidate.substring(0, 30));
-                    socket.emit("message", { roomId, candidate: event.candidate });
-                }
+                if (event.candidate) socket.emit("message", { roomId, candidate: event.candidate });
             };
         }
-
-        async function resendOffer() {
-            const roomId = document.getElementById('roomId').value;
-            if (peerConnection && peerConnection.signalingState === "stable") {
-                console.log("[LAPTOP] Renegotiating: Creating new offer...");
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                socket.emit("message", { roomId, offer: { sdp: offer.sdp, type: offer.type } });
-            } else {
-                console.log("[LAPTOP] resendOffer ignored - already in state:", peerConnection?.signalingState);
-            }
-        }
-
-        socket.on("new-peer", () => {
-            console.log("A new device joined!");
-            if (localStream) {
-                console.log("I am already sharing. Sending offer to new peer...");
-                resendOffer();
-            }
-        });
 
         socket.on("message", async (data) => {
             if (data.offer) {
-                console.log("[LAPTOP] RECEIVED OFFER from Android");
-                if (!peerConnection) {
-                    console.log("[LAPTOP] PeerConnection missing, creating now...");
-                    await createPeerConnection(data.roomId);
-                } else if (peerConnection.signalingState !== "stable") {
-                    // Signaling collision detected!
-                    // Laptop is the "polite" peer and will rollback its own offer to accept the phone's.
-                    console.log("[LAPTOP] Signaling collision - rolling back to accept Android offer");
-                    await Promise.all([
-                        peerConnection.setLocalDescription({type: "rollback"}),
-                        peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
-                    ]);
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    socket.emit("message", {
-                        roomId: data.roomId,
-                        answer: { sdp: answer.sdp, type: answer.type }
-                    });
-                    console.log("[LAPTOP] Rolled back and sent ANSWER to Android");
-                    return;
-                }
-
-                console.log("[LAPTOP] Setting Remote Description from Android Offer");
+                if (!peerConnection) await createPeerConnection(data.roomId);
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                 const answer = await peerConnection.createAnswer();
-                console.log("[LAPTOP] Created ANSWER, setting local description");
                 await peerConnection.setLocalDescription(answer);
-                socket.emit("message", {
-                    roomId: data.roomId,
-                    answer: { sdp: answer.sdp, type: answer.type }
-                });
-                console.log("[LAPTOP] Sent ANSWER to Android");
+                socket.emit("message", { roomId: data.roomId, answer });
             } else if (data.answer) {
-                if (peerConnection.signalingState === "have-local-offer") {
-                    console.log("[LAPTOP] RECEIVED ANSWER from Android, setting Remote Description");
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                } else {
-                    console.warn("[LAPTOP] Received ANSWER but signaling state is:", peerConnection.signalingState, "- ignoring");
-                }
+                if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             } else if (data.candidate && peerConnection) {
-                // console.log("[LAPTOP] RECEIVED ICE CANDIDATE from Android");
                 await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         });
 
-        socket.on("connect", () => console.log("Connected to signaling server"));
+        // Fast re-connect if roomId is already entered
+        roomIdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') startSharing();
+        });
     </script>
 </body>
 </html>
