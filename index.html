@@ -272,7 +272,7 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const socket = io({ transports: ['websocket'] });
+        const socket = io("https://33f1-197-211-59-81.ngrok-free.app/", { transports: ['websocket'] });
         let peerConnection;
         let dataChannel;
         const remoteVideo = document.getElementById('remoteVideo');
@@ -388,7 +388,9 @@
         }
 
         const config = { iceServers: [
-            { urls: "stun:stun.relay.metered.ca:80" },
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:19302" },
             { urls: "turn:global.relay.metered.ca:80", username: "d96b37d0e903f99258135973", credential: "1lHMKzPiNxyHbls9" }
         ]};
 
