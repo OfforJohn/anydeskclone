@@ -122,7 +122,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px 40px 150px 40px; /* Increased bottom padding significantly to move whole section up */
+            padding: 20px 40px;
             box-sizing: border-box;
         }
 
@@ -130,7 +130,7 @@
             width: 100%;
             height: 100%;
             max-width: 1000px;
-            max-height: 78vh; /* Slightly smaller height to ensure the bottom isn't cut off */
+            max-height: 78vh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -150,48 +150,11 @@
             display: none;
         }
 
-        #dino-loader {
+        #draw-overlay {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: #000;
-            z-index: 5;
-        }
-
-        .dino-track {
-            position: relative;
-            width: 300px;
-            height: 100px;
-            overflow: hidden;
-            border-bottom: 2px solid #333;
-            margin-bottom: 20px;
-        }
-
-        .scrolling-dino {
-            position: absolute;
-            font-size: 40px;
-            bottom: 5px;
-            animation: dino-scroll linear infinite;
-        }
-
-        .dino-1 { animation-duration: 3s; left: -50px; }
-        .dino-2 { animation-duration: 5s; left: -100px; animation-delay: 1s; }
-        .dino-3 { animation-duration: 4s; left: -150px; animation-delay: 0.5s; }
-
-        @keyframes dino-scroll {
-            from { transform: translateX(0); left: -50px; }
-            to { transform: translateX(400px); left: -50px; }
-        }
-
-        .waiting-text {
-            color: var(--text-dim);
-            font-size: 1.1rem;
-            font-weight: 500;
-            letter-spacing: 1px;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
         }
 
         .status-badge {
@@ -212,6 +175,50 @@
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
         .status-dot.active { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
 
+        .control-panel {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-btn {
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover { background: rgba(255, 255, 255, 0.8); color: black; }
+        .active-mode { background: #00ff88 !important; color: black !important; font-weight: bold; }
+
+        .unlock-input {
+            width: 80px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            text-align: center;
+            font-size: 0.9rem;
+            display: none;
+        }
+
         .btn-refresh {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -224,7 +231,144 @@
             font-size: 0.8rem;
         }
         .btn-refresh:hover { background: rgba(255, 255, 255, 0.2); }
-        .btn-refresh i { margin-right: 4px; }
+
+        #dino-loader {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            z-index: 5;
+        }
+        .dino-track {
+            position: relative;
+            width: 300px;
+            height: 100px;
+            overflow: hidden;
+            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+        }
+        .scrolling-dino {
+            position: absolute;
+            font-size: 40px;
+            bottom: 5px;
+            animation: dino-scroll linear infinite;
+        }
+        .dino-1 { animation-duration: 3s; left: -50px; }
+        .dino-2 { animation-duration: 5s; left: -100px; animation-delay: 1s; }
+        .dino-3 { animation-duration: 4s; left: -150px; animation-delay: 0.5s; }
+        @keyframes dino-scroll {
+            from { transform: translateX(0); left: -50px; }
+            to { transform: translateX(400px); left: -50px; }
+        }
+
+        /* Simulator Overlays - Higher Visibility */
+        .simulator-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.4); /* Darker background for better contrast */
+            backdrop-filter: blur(3px);
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .pin-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.08); /* Brighter glass effect */
+            border-radius: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.4); /* Solid, brighter border */
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            pointer-events: none;
+            width: 150px;
+            margin-top: 110px;
+        }
+
+        .pin-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.6); /* High visibility white border */
+            background: rgba(0, 0, 0, 0.2);
+            color: #ffffff; /* Bright white text */
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 40px; /* Reduced gap */
+            padding: 30px;
+            position: relative;
+            pointer-events: none;
+            width: 220px; /* Reduced width */
+            margin-top: 60px; /* Positioned lower */
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .pattern-dot {
+            width: 18px; /* Slightly larger */
+            height: 18px;
+            background: #ffffff; /* Solid white dots for high visibility */
+            border: 2px solid #00ff88;
+            border-radius: 50%;
+            position: relative;
+            z-index: 2;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .pattern-dot.active {
+            background: rgba(0, 255, 136, 0.4);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+        }
+
+        /* Click Indicator Animation */
+        .click-indicator {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #00ff88;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(0);
+            animation: ripple 0.5s ease-out forwards;
+            z-index: 9999;
+        }
+
+        @keyframes ripple {
+            0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+
+        .pattern-dot.active {
+            background: rgba(0, 255, 136, 0.4);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+        }
+
+        .pattern-line-canvas {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -253,47 +397,127 @@
     </div>
 
     <main>
-        <div class="remote-container">
+        <div class="remote-container" id="remote-container">
             <div id="dino-loader" style="display: none;">
                 <div class="dino-track">
                     <div class="scrolling-dino dino-1">🦖</div>
                     <div class="scrolling-dino dino-2">🦕</div>
                     <div class="scrolling-dino dino-3">🦖</div>
                 </div>
-                <div class="waiting-text">Waiting for device screen...</div>
+                <div class="waiting-text" style="color: #888;">Waiting for device screen...</div>
             </div>
             <video id="remoteVideo" autoplay playsinline></video>
+            <canvas id="draw-overlay"></canvas>
+
+            <!-- PIN Simulator (Transparent Guidance) -->
+            <div id="pin-simulator" class="simulator-overlay">
+                <div class="pin-grid">
+                    <div class="pin-btn">1</div>
+                    <div class="pin-btn">2</div>
+                    <div class="pin-btn">3</div>
+                    <div class="pin-btn">4</div>
+                    <div class="pin-btn">5</div>
+                    <div class="pin-btn">6</div>
+                    <div class="pin-btn">7</div>
+                    <div class="pin-btn">8</div>
+                    <div class="pin-btn">9</div>
+                    <div class="pin-btn" style="font-size: 0.8rem; border-color: rgba(255,68,68,0.2);"><i class="fas fa-backspace"></i></div>
+                    <div class="pin-btn">0</div>
+                    <div class="pin-btn" style="font-size: 0.8rem; border-color: rgba(0,255,136,0.2);">OK</div>
+                </div>
+            </div>
+
+            <!-- Pattern Simulator (Transparent Guidance) -->
+            <div id="pattern-simulator" class="simulator-overlay">
+                <div class="pattern-grid" id="pattern-grid">
+                    <div class="pattern-dot" data-idx="0"></div>
+                    <div class="pattern-dot" data-idx="1"></div>
+                    <div class="pattern-dot" data-idx="2"></div>
+                    <div class="pattern-dot" data-idx="3"></div>
+                    <div class="pattern-dot" data-idx="4"></div>
+                    <div class="pattern-dot" data-idx="5"></div>
+                    <div class="pattern-dot" data-idx="6"></div>
+                    <div class="pattern-dot" data-idx="7"></div>
+                    <div class="pattern-dot" data-idx="8"></div>
+                    <canvas id="pattern-line-canvas" class="pattern-line-canvas"></canvas>
+                </div>
+            </div>
         </div>
-        <div class="status-badge">
+
+        <div class="status-badge" style="z-index: 10000;">
             <div id="status-dot" class="status-dot"></div>
             <span id="status-text">Ready</span>
+        </div>
+
+        <div class="control-panel" id="remote-controls" style="display: none;">
+            <input type="password" id="unlock-pin" class="unlock-input" placeholder="PIN" maxlength="6">
+            <button class="action-btn" id="unlock-toggle" onclick="toggleUnlockInput()">
+                <i class="fas fa-keyboard"></i> PIN
+            </button>
+            <button class="action-btn" id="pattern-toggle" onclick="togglePatternMode()">
+                <i class="fas fa-braille"></i> Pattern Mode
+            </button>
+            <button class="action-btn" id="send-unlock" style="display: none;" onclick="sendUnlock()">
+                Confirm
+            </button>
         </div>
     </main>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const socket = io("https://anydeskclone-1.onrender.com/", { transports: ['websocket'] });
+        const socket = io({ transports: ['websocket'] });
         let peerConnection;
         let dataChannel;
+
         const remoteVideo = document.getElementById('remoteVideo');
+        const drawCanvas = document.getElementById('draw-overlay');
+        const drawCtx = drawCanvas.getContext('2d');
         const dinoLoader = document.getElementById('dino-loader');
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
         const roomIdInput = document.getElementById('roomId');
+        const pinSimulator = document.getElementById('pin-simulator');
+        const patternSimulator = document.getElementById('pattern-simulator');
+        const patternCanvas = document.getElementById('pattern-line-canvas');
+        const patternCtx = patternCanvas.getContext('2d');
+        const patternDots = document.querySelectorAll('.pattern-dot');
+
+        let isPatternMode = false;
+        let patternPoints = [];
+        let isDrawingPattern = false;
+        let currentPin = "";
 
         // Load saved Room ID
         const savedRoomId = localStorage.getItem('lastRoomId');
-        if (savedRoomId) {
-            roomIdInput.value = savedRoomId;
-        }
+        if (savedRoomId) roomIdInput.value = savedRoomId;
 
         function updateStatus(status, isActive) {
             statusText.innerText = status;
             statusDot.className = 'status-dot' + (isActive ? ' active' : '');
+            if (isActive) {
+                document.getElementById('remote-controls').style.display = 'flex';
+                document.getElementById('active-info').style.display = 'block';
+            }
         }
 
-        let isMouseDown = false;
-        let startX, startY, startTime;
+        function togglePatternMode() {
+            isPatternMode = !isPatternMode;
+            const btn = document.getElementById('pattern-toggle');
+            if (isPatternMode) {
+                btn.classList.add('active-mode');
+                btn.innerHTML = '<i class="fas fa-fingerprint"></i> DRAW ON SCREEN';
+                drawCanvas.width = remoteVideo.clientWidth;
+                drawCanvas.height = remoteVideo.clientHeight;
+                drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                if (dataChannel?.readyState === 'open') {
+                    dataChannel.send(JSON.stringify({ type: 'swipe', x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, duration: 300 }));
+                }
+            } else {
+                btn.classList.remove('active-mode');
+                btn.innerHTML = '<i class="fas fa-braille"></i> Pattern Mode';
+                drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            }
+        }
 
         function getCoords(e) {
             const rect = remoteVideo.getBoundingClientRect();
@@ -309,16 +533,47 @@
             }
             return {
                 x: (e.clientX - rect.left - offsetX) / actualWidth,
-                y: (e.clientY - rect.top - offsetY) / actualHeight
+                y: (e.clientY - rect.top - offsetY) / actualHeight,
+                canvasX: e.clientX - rect.left,
+                canvasY: e.clientY - rect.top
             };
+        }
+
+        function showClickEffect(e) {
+            const effect = document.createElement('div');
+            effect.className = 'click-indicator';
+            effect.style.left = e.clientX + 'px';
+            effect.style.top = e.clientY + 'px';
+            document.body.appendChild(effect);
+            setTimeout(() => effect.remove(), 500);
         }
 
         remoteVideo.addEventListener('mousedown', (e) => {
             if (remoteVideo.style.display === 'none') return;
+
+            showClickEffect(e);
+
             isMouseDown = true;
             const coords = getCoords(e);
             startX = coords.x; startY = coords.y; startTime = Date.now();
+            if (isPatternMode) {
+                patternPoints = [{ x: coords.x, y: coords.y }];
+                drawCtx.beginPath();
+                drawCtx.lineWidth = 4;
+                drawCtx.strokeStyle = "#00ff88";
+                drawCtx.moveTo(coords.canvasX, coords.canvasY);
+            }
             e.preventDefault();
+        });
+
+        remoteVideo.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            const coords = getCoords(e);
+            if (isPatternMode) {
+                patternPoints.push({ x: coords.x, y: coords.y });
+                drawCtx.lineTo(coords.canvasX, coords.canvasY);
+                drawCtx.stroke();
+            }
         });
 
         remoteVideo.addEventListener('mouseup', (e) => {
@@ -328,8 +583,11 @@
             const duration = Date.now() - startTime;
             const dist = Math.sqrt(Math.pow(coords.x - startX, 2) + Math.pow(coords.y - startY, 2));
 
-            if (dataChannel && dataChannel.readyState === 'open') {
-                if (dist < 0.01) {
+            if (dataChannel?.readyState === 'open') {
+                if (isPatternMode && patternPoints.length > 5) {
+                    dataChannel.send(JSON.stringify({ type: 'unlock', points: patternPoints }));
+                    setTimeout(togglePatternMode, 1000);
+                } else if (dist < 0.01) {
                     dataChannel.send(JSON.stringify({ type: 'click', x: startX, y: startY }));
                 } else {
                     dataChannel.send(JSON.stringify({
@@ -345,10 +603,7 @@
         function startSharing() {
             const roomId = roomIdInput.value;
             if (!roomId) return;
-
-            // Save for next reload
             localStorage.setItem('lastRoomId', roomId);
-
             document.getElementById('setup-screen').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('setup-screen').style.display = 'none';
@@ -356,46 +611,27 @@
                 document.getElementById('display-room-id').innerText = roomId;
                 dinoLoader.style.display = 'flex';
             }, 300);
-
             socket.emit("join", roomId);
             updateStatus("Connecting...", false);
-
-            // Initiate connection immediately to speed up
             createPeerConnection(roomId);
         }
 
         function refreshConnection() {
             const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
             if (!roomId) return;
-
-            console.log("Refreshing connection for room:", roomId);
             updateStatus("Refreshing...", false);
-
-            // Clean up old connection
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
+            if (peerConnection) peerConnection.close();
+            peerConnection = null;
             dataChannel = null;
-
-            // Reset UI
             remoteVideo.style.display = 'none';
             dinoLoader.style.display = 'flex';
-
-            // Re-join and re-initiate
             socket.emit("join", roomId);
             createPeerConnection(roomId);
         }
 
-        const config = { iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "stun:stun2.l.google.com:19302" },
-            { urls: "turn:global.relay.metered.ca:80", username: "d96b37d0e903f99258135973", credential: "1lHMKzPiNxyHbls9" }
-        ]};
-
         async function createPeerConnection(roomId) {
             if (peerConnection) return;
+            const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
             peerConnection = new RTCPeerConnection(config);
             peerConnection.ondatachannel = (event) => {
                 dataChannel = event.channel;
@@ -406,11 +642,9 @@
                 remoteVideo.style.display = 'block';
                 dinoLoader.style.display = 'none';
             };
-
             const offer = await peerConnection.createOffer({ offerToReceiveVideo: true });
             await peerConnection.setLocalDescription(offer);
             socket.emit("message", { roomId, offer });
-
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) socket.emit("message", { roomId, candidate: event.candidate });
             };
@@ -430,10 +664,68 @@
             }
         });
 
-        // Fast re-connect if roomId is already entered
-        roomIdInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') startSharing();
-        });
+        function toggleUnlockInput() {
+            const btn = document.getElementById('unlock-toggle');
+            if (pinSimulator.style.display === 'none' || !pinSimulator.style.display) {
+                // Open PIN Guidance Overlay
+                pinSimulator.style.display = 'flex';
+                btn.classList.add('active-mode');
+                btn.innerHTML = '<i class="fas fa-times"></i> Close PIN';
+
+                // If pattern is open, close it
+                if (isPatternMode) togglePatternMode();
+
+                // Wake up screen/swipe up to show PIN keypad
+                if (dataChannel?.readyState === 'open') {
+                    dataChannel.send(JSON.stringify({ type: 'swipe', x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, duration: 300 }));
+                }
+            } else {
+                // Close PIN Guidance Overlay
+                pinSimulator.style.display = 'none';
+                btn.classList.remove('active-mode');
+                btn.innerHTML = '<i class="fas fa-keyboard"></i> PIN';
+            }
+        }
+
+        // Removed older simulation functions as clicks now go directly to the phone
+
+        function sendUnlockPin(pin) {
+            if (dataChannel?.readyState === 'open') {
+                console.log("[SIM] Sending PIN to device:", pin);
+                dataChannel.send(JSON.stringify({ type: 'unlock', pin: pin }));
+            }
+        }
+
+        function togglePatternMode() {
+            isPatternMode = !isPatternMode;
+            const btn = document.getElementById('pattern-toggle');
+            if (isPatternMode) {
+                // Open Pattern Guidance Overlay
+                patternSimulator.style.display = 'flex';
+                btn.classList.add('active-mode');
+                btn.innerHTML = '<i class="fas fa-fingerprint"></i> GUIDE ACTIVE';
+
+                // If PIN is open, close it
+                if (pinSimulator.style.display === 'flex') toggleUnlockInput();
+
+                // Wake up screen/swipe up to show pattern dots
+                if (dataChannel?.readyState === 'open') {
+                    dataChannel.send(JSON.stringify({ type: 'swipe', x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, duration: 300 }));
+                }
+            } else {
+                // Close Pattern Guidance Overlay
+                patternSimulator.style.display = 'none';
+                btn.classList.remove('active-mode');
+                btn.innerHTML = '<i class="fas fa-braille"></i> Pattern Mode';
+            }
+        }
+
+        // Removed pattern drawing event handlers (startPattern, movePattern, endPattern)
+        // as interaction now passes through to the standard remote control logic.
+
+        // Original touch/swipe logic still applies to the video background
+        let isMouseDown = false;
+        let startX, startY, startTime;
     </script>
 </body>
 </html>
