@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
 const path = require('path');
+const { spawn } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,37 +15,62 @@ const io = new Server(server, {
   transports: ['websocket', 'polling']
 });
 
+// --- AUTOMATIC AI CLIENT SPAWNER (Improved) ---
+function startAIClient() {
+    console.log("[AI] Starting Python AI Client automatically...");
+
+    // Improved spawning logic for better reliability on VPS
+    const pythonProcess = spawn('python3', [path.join(__dirname, 'meo_ai_client.py')], {
+        cwd: __dirname,
+        env: process.env
+    });
+
+    pythonProcess.stdout.on('data', (data) => {
+        console.log(`[AI-PYTHON] ${data.toString().trim()}`);
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        console.error(`[AI-ERROR] ${data.toString().trim()}`);
+    });
+
+    pythonProcess.on('error', (err) => {
+        console.error("[AI-SPAWN-ERROR]", err);
+    });
+
+    pythonProcess.on('close', (code) => {
+        console.log(`[AI] Python client exited with code ${code}. Restarting in 5s...`);
+        setTimeout(startAIClient, 5000);
+    });
+}
+// ------------------------------------
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 io.on("connection", (socket) => {
-    const transport = socket.conn.transport.name;
-    console.log(`[CONN] New device connected: ${socket.id} (Transport: ${transport})`);
-
     socket.on("join", (roomId) => {
         socket.join(roomId);
-        const clients = io.sockets.adapter.rooms.get(roomId);
-        const peerCount = clients ? clients.size : 0;
-        console.log(`[ROOM] ${socket.id} joined ${roomId}. Total peers now: ${peerCount}`);
-
-        // Notify others that a new peer joined (helps trigger offer)
+        console.log(`[ROOM] ${socket.id} joined ${roomId}`);
         socket.to(roomId).emit("new-peer", { id: socket.id });
     });
 
     socket.on("message", (data) => {
-        const type = data.offer ? "OFFER" : data.answer ? "ANSWER" : "CANDIDATE";
-        let detail = "";
-        if (data.candidate) detail = `(${data.candidate.candidate.substring(0, 40)}...)`;
-
-        console.log(`[MSG] [${data.roomId}] Forwarding ${type} from ${socket.id} ${detail}`);
-
-        // Broadcast to everyone else in the room
         socket.to(data.roomId).emit("message", data);
     });
 
+    // New: Broadcast click events to Python AI Client
+    socket.on("device_click", (data) => {
+        socket.to(data.roomId).emit("device_click_broadcast", data);
+    });
+
+    // New: Handle AI responses and broadcast to web UI
+    socket.on("ai_key_guess", (data) => {
+        socket.to(data.roomId).emit("ai_key_guess_broadcast", data);
+    });
+
     socket.on("disconnect", (reason) => {
-        console.log(`[DISCONN] Device ${socket.id} disconnected. Reason: ${reason}`);
+        console.log(`[DISCONN] Device ${socket.id} disconnected.`);
     });
 });
 
@@ -52,6 +78,8 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
     console.log("========================================");
     console.log(`Signaling server running on port ${PORT}`);
-    console.log(`PC: Open http://localhost:${PORT}`);
     console.log("========================================");
+
+    // Start AI automatically when server is ready
+    startAIClient();
 });

