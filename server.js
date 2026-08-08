@@ -65,6 +65,14 @@ io.on("connection", (socket) => {
     });
 
     socket.on("message", (data) => {
+        // If the Android app sends a device_click via the message channel (signaling)
+        if (data && data.type === "device_click") {
+            const roomId = data.roomId;
+            const clickPayload = { ...data, source: "Device Tap" };
+            console.log(`[DEBUG] Forwarding Signaling click to AI for room: ${roomId}`);
+            io.to(roomId).emit("device_click_broadcast", clickPayload);
+            io.to("ai-room").emit("device_click_broadcast", clickPayload);
+        }
         socket.to(data.roomId).emit("message", data);
     });
 
