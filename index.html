@@ -661,6 +661,9 @@
             console.log("Connected to server with ID:", socket.id);
         });
 
+        let peerConnection;
+        let dataChannel;
+
         const remoteVideo = document.getElementById('remoteVideo');
         const drawCanvas = document.getElementById('draw-overlay');
         const drawCtx = drawCanvas.getContext('2d');
