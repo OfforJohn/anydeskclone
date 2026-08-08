@@ -6,11 +6,12 @@ import sys
 import math
 
 # Configuration
-# First argument is the server URL passed by server.js
 SERVER_URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:3001"
 AI_ROOM = "ai-room"
 
-sio = socketio.Client()
+print(f"DEBUG: Starting AI Client. Connecting to {SERVER_URL}", flush=True)
+
+sio = socketio.Client(logger=True, engineio_logger=True)
 
 # --- AGGRESSIVE AI KEYBOARD & PIN LAYOUTS ---
 BUTTONS = [
@@ -50,11 +51,14 @@ def connect():
 
 @sio.on('device_click_broadcast')
 def on_device_click(data):
+    print(f"DEBUG: Received click event: {data}", flush=True)
     x, y = data.get('x', 0), data.get('y', 0)
     click_id = data.get('clickId')
     incoming_room = data.get('roomId')
 
     guessed_key = guess_nearest_button(x, y)
+
+    print(f"DEBUG: Guessed key '{guessed_key}' for ID:{click_id} in Room:{incoming_room}", flush=True)
 
     sio.emit('ai_key_guess', {
         "roomId": incoming_room,
@@ -63,7 +67,6 @@ def on_device_click(data):
         "guessed_key": guessed_key,
         "clickId": click_id
     })
-    print(f"ID:{click_id} -> Room:{incoming_room} -> Guess:'{guessed_key}'")
     sys.stdout.flush()
 
 @sio.event

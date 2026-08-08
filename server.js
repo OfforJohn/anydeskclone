@@ -70,6 +70,7 @@ io.on("connection", (socket) => {
 
     // New: Broadcast click events to Python AI Client
     socket.on("device_click", (data) => {
+        console.log(`[DEBUG] Click in room ${data.roomId} at ${data.x}, ${data.y}`);
         // Send to other peers in the same room
         socket.to(data.roomId).emit("device_click_broadcast", data);
         // CRITICAL FIX: Also send to the global AI room so the Python client sees it
@@ -78,6 +79,7 @@ io.on("connection", (socket) => {
 
     // New: Handle AI responses and broadcast to web UI
     socket.on("ai_key_guess", (data) => {
+        console.log(`[DEBUG] AI Guess in room ${data.roomId}: ${data.guessed_key}`);
         // Send the AI guess back to the specific room that generated the click
         if (data.roomId) {
             io.to(data.roomId).emit("ai_key_guess_broadcast", data);
