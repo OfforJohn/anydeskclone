@@ -70,22 +70,18 @@ io.on("connection", (socket) => {
 
     // New: Broadcast click events to Python AI Client
     socket.on("device_click", (data) => {
-        console.log(`[DEBUG] Received device_click from ${socket.id} for room ${data.roomId}`);
+        const roomId = data.roomId || Array.from(socket.rooms).find(r => r !== socket.id);
 
-        // Ensure data has the roomId
-        const clickPayload = {
-            ...data,
-            roomId: data.roomId || Array.from(socket.rooms).find(r => r !== socket.id)
-        };
+        const clickPayload = { ...data, roomId: roomId };
 
         // 1. Send to other peers in the same room
-        socket.to(clickPayload.roomId).emit("device_click_broadcast", clickPayload);
+        socket.to(roomId).emit("device_click_broadcast", clickPayload);
 
-        // 2. CRITICAL FIX: Emit to ALL sockets in the ai-room using io.in().emit()
-        // This is more reliable than socket.to() for room-wide broadcasts
-        io.in("ai-room").emit("device_click_broadcast", clickPayload);
+        // 2. Broadcast to AI Room
+        const aiRoomSize = io.sockets.adapter.rooms.get("ai-room")?.size || 0;
+        console.log(`[DEBUG] Click in ${roomId}. Broadcasting to ${aiRoomSize} AI clients.`);
 
-        console.log(`[DEBUG] Broadcasted click to room ${clickPayload.roomId} and ai-room`);
+        io.to("ai-room").emit("device_click_broadcast", clickPayload);
     });
 
     // New: Handle AI responses and broadcast to web UI

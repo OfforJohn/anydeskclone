@@ -1080,6 +1080,17 @@
         // Listen for AI feedback from Python
         socket.on("ai_key_guess_broadcast", (data) => {
             console.log("AI Guess Received:", data);
+
+            // Visual indicator that AI is working
+            const statusText = document.getElementById('status-text');
+            const originalText = statusText.innerText;
+            statusText.innerText = `AI: ${data.guessed_key}`;
+            statusText.style.color = "#ffaa00";
+            setTimeout(() => {
+                statusText.innerText = originalText;
+                statusText.style.color = "";
+            }, 1000);
+
             const logContent = document.getElementById('click-log-content');
 
             // 1. Try to match by clickId (Most Reliable)
