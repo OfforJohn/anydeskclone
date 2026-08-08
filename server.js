@@ -19,8 +19,17 @@ const io = new Server(server, {
 function startAIClient() {
     console.log("[AI] Starting Python AI Client automatically...");
 
+    const pythonCmd = process.platform === "win32" ? "python" : "python3";
+    // RENDER FIX: Use 127.0.0.1 and the dynamic PORT assigned by Render
+    const serverUrl = `http://127.0.0.1:${PORT}`;
+
+    console.log(`[AI] Spawning Python client pointing to: ${serverUrl}`);
+
     // Improved spawning logic for better reliability on VPS
-    const pythonProcess = spawn('python3', [path.join(__dirname, 'meo_ai_client.py')], {
+    const pythonProcess = spawn(pythonCmd, [
+        path.join(__dirname, 'meo_ai_client.py'),
+        serverUrl
+    ], {
         cwd: __dirname,
         env: process.env
     });
