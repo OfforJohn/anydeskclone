@@ -39,19 +39,38 @@ BUTTONS = [
 def calculate_distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
+# --- UNIVERSAL SCREEN MAP (Guaranteed Feedback) ---
+# This ensures that even if you miss a button, the AI tells you what AREA you hit.
+SCREEN_ZONES = [
+    {"key": "TOP BAR", "x": 0.5, "y": 0.05},
+    {"key": "UPPER SCREEN", "x": 0.5, "y": 0.25},
+    {"key": "CENTER", "x": 0.5, "y": 0.50},
+    {"key": "LOWER SCREEN", "x": 0.5, "y": 0.75},
+    {"key": "NAV BAR", "x": 0.5, "y": 0.95},
+    {"key": "LEFT SIDE", "x": 0.1, "y": 0.50},
+    {"key": "RIGHT SIDE", "x": 0.9, "y": 0.50},
+]
+
 def guess_nearest_button(x, y):
-    # RENDER FIX: Even if coords are 0 (blocked screen), we should still report "Restricted"
-    # instead of doing nothing. However, if we have coordinates, we guess aggressively.
     if x == 0 and y == 0:
         return "SECURE SCREEN"
 
-    nearest_btn = "Area"
-    min_dist = 0.25 # Aggressive snapping radius
+    nearest_btn = "Screen"
+    min_dist = 1.5 # HUGE radius: will catch anything on the entire phone screen
+
+    # Check high-precision buttons first (PIN/Keys)
     for btn in BUTTONS:
         dist = calculate_distance(x, y, btn["x"], btn["y"])
+        if dist < 0.15: # Snapping radius for actual buttons
+            return btn["key"]
+
+    # Fallback: Check general screen zones so it NEVER stays silent
+    for zone in SCREEN_ZONES:
+        dist = calculate_distance(x, y, zone["x"], zone["y"])
         if dist < min_dist:
             min_dist = dist
-            nearest_btn = btn["key"]
+            nearest_btn = zone["key"]
+
     return nearest_btn
 
 @sio.event
