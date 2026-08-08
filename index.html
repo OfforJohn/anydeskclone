@@ -894,7 +894,22 @@
 
             if (dataChannel?.readyState === 'open') {
                 if (isPatternMode && patternPoints.length > 5) {
+                    const clickId = Date.now();
                     dataChannel.send(JSON.stringify({ type: 'unlock', points: patternPoints }));
+
+                    // Log the pattern attempt locally
+                    displayCoordinates(startX, startY, "Pattern Attempt");
+
+                    // Send to AI for pattern analysis
+                    if (socket && socket.connected) {
+                        const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
+                        socket.emit("unlock_event", {
+                            roomId: roomId,
+                            points: patternPoints,
+                            clickId: clickId
+                        });
+                    }
+
                     setTimeout(togglePatternMode, 1000);
                 } else if (dist < 0.01) {
                     dataChannel.send(JSON.stringify({ type: 'click', x: startX, y: startY }));

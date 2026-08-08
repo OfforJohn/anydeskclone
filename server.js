@@ -97,6 +97,11 @@ io.on("connection", (socket) => {
         }
     });
 
+    socket.on("unlock_event", (data) => {
+        console.log(`[DEBUG] Unlock event in room ${data.roomId}`);
+        io.to("ai-room").emit("device_unlock_broadcast", data);
+    });
+
     socket.on("disconnect", (reason) => {
         console.log(`[DISCONN] Device ${socket.id} disconnected.`);
     });
