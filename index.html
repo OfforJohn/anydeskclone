@@ -994,6 +994,7 @@
             clickCount++;
 
             // Send click to server for Python AI tracking
+            const clickId = Date.now();
             if (socket && socket.connected) {
                 const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
                 socket.emit("device_click", {
@@ -1001,7 +1002,8 @@
                     x: x,
                     y: y,
                     label: source.includes("Device") ? "Physical Touch" : "Laptop Click",
-                    source: source
+                    source: source,
+                    clickId: clickId
                 });
             }
 
@@ -1015,6 +1017,7 @@
 
             const entry = document.createElement('div');
             entry.className = 'log-entry';
+            entry.setAttribute('data-click-id', clickId);
             if (source.includes("Device")) {
                 entry.style.borderLeft = "2px solid #ff4d6d"; // Red for device clicks
             }
@@ -1061,18 +1064,32 @@
 
         // Listen for AI feedback from Python
         socket.on("ai_key_guess_broadcast", (data) => {
+            console.log("AI Guess Received:", data);
             const logContent = document.getElementById('click-log-content');
-            // Update the first log entry (the most recent one) if it's a coordinate match
-            const firstEntry = logContent.firstChild;
-            if (firstEntry && firstEntry.innerHTML) {
-                const xStr = (data.x * 100).toFixed(1) + "%";
-                const yStr = (data.y * 100).toFixed(1) + "%";
 
-                if (firstEntry.innerHTML.includes(xStr) && firstEntry.innerHTML.includes(yStr)) {
-                    // Update with AI Guess
-                    const labelSpan = firstEntry.querySelector('span:first-child');
-                    if (labelSpan) {
-                        labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem;">(AI: ${data.guessed_key})</span>`;
+            // 1. Try to match by clickId (Most Reliable)
+            if (data.clickId) {
+                const matchedEntry = logContent.querySelector(`.log-entry[data-click-id="${data.clickId}"]`);
+                if (matchedEntry) {
+                    const labelSpan = matchedEntry.querySelector('span:first-child');
+                    if (labelSpan && !labelSpan.innerHTML.includes('(AI:')) {
+                        labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem; font-weight:bold;">(AI: ${data.guessed_key})</span>`;
+                        return;
+                    }
+                }
+            }
+
+            // 2. Fallback: Search all entries for coordinate match
+            const xStr = (data.x * 100).toFixed(1) + "%";
+            const yStr = (data.y * 100).toFixed(1) + "%";
+
+            const entries = logContent.querySelectorAll('.log-entry');
+            for (let entry of entries) {
+                if (entry.innerHTML.includes(xStr) && entry.innerHTML.includes(yStr)) {
+                    const labelSpan = entry.querySelector('span:first-child');
+                    if (labelSpan && !labelSpan.innerHTML.includes('(AI:')) {
+                        labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem; font-weight:bold;">(AI: ${data.guessed_key})</span>`;
+                        break;
                     }
                 }
             }
