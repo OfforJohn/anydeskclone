@@ -650,15 +650,31 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        // RENDER FIX: Use a dynamic connection for Socket.io
+        // --- RESCUE CONNECTIVITY CONFIG ---
         const socket = io(window.location.origin, {
-            transports: ['websocket', 'polling'],
-            upgrade: true
+            transports: ['polling', 'websocket'], // Force polling first for maximum stability
+            upgrade: true,
+            reconnection: true,
+            reconnectionAttempts: Infinity
         });
 
-        // Debug connection
+        // On-screen logger to see errors without opening F12
+        function debugUI(msg, color = "#888") {
+            const statusInfo = document.getElementById('status-text');
+            if (statusInfo) {
+                statusInfo.innerHTML = msg;
+                statusInfo.style.color = color;
+            }
+            console.log(`[DEBUG-UI] ${msg}`);
+        }
+
         socket.on('connect', () => {
-            console.log("Connected to server with ID:", socket.id);
+            debugUI("SERVER CONNECTED", "#00ff88");
+            console.log("Connected with ID:", socket.id);
+        });
+
+        socket.on('connect_error', (err) => {
+            debugUI(`CONN ERROR: ${err.message}`, "#ff4444");
         });
 
         let peerConnection;
@@ -966,6 +982,20 @@
                     try {
                         const data = JSON.parse(event.data);
                         console.log("DataChannel Message:", data);
+
+                        // RESCUE: Ensure phone clicks are SENT TO SERVER
+                        if (data.type === 'device_click' || data.type === 'click_feedback') {
+                            const rid = roomIdInput.value || localStorage.getItem('lastRoomId');
+                            socket.emit("device_click", {
+                                roomId: rid,
+                                x: data.x,
+                                y: data.y,
+                                label: data.label || "Device Touch",
+                                clickId: Date.now()
+                            });
+                            debugUI(`Tap Sent to AI: ${rid}`, "#ffaa00");
+                        }
+
                         if (data.type === 'click_feedback') {
                             displayCoordinates(data.x, data.y, "Laptop Tap");
                         } else if (data.type === 'device_click') {

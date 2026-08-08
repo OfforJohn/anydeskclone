@@ -83,7 +83,7 @@ io.on("connection", (socket) => {
 
     // New: Broadcast click events to Python AI Client
     socket.on("device_click", (data) => {
-        const roomId = data.roomId || Array.from(socket.rooms).find(r => r !== socket.id);
+        const roomId = data.roomId || "global";
 
         const clickPayload = {
             ...data,
@@ -91,22 +91,22 @@ io.on("connection", (socket) => {
             source: data.source || "Physical Touch"
         };
 
-        console.log(`[DEBUG] Click in ${roomId}. Broadcasting to AI.`);
+        // 1. Send to laptop browser specifically
+        io.to(roomId).emit("device_click_broadcast", clickPayload);
 
-        // 1. Send to laptop browser
-        io.in(roomId).emit("device_click_broadcast", clickPayload);
+        // 2. ULTIMATE FIX: Broadcast to EVERYONE in ai-room (The AI)
+        io.emit("device_click_broadcast", clickPayload);
 
-        // 2. CRITICAL: SHOUT to AI Room
-        io.in("ai-room").emit("device_click_broadcast", clickPayload);
+        console.log(`[AI-ROUTING] Shout click from ${roomId} to all listeners.`);
     });
 
     // New: Handle AI responses and broadcast to web UI
     socket.on("ai_key_guess", (data) => {
-        console.log(`[DEBUG] AI Guess in room ${data.roomId}: ${data.guessed_key}`);
-        // Send the AI guess back to the specific room that generated the click
-        if (data.roomId) {
-            io.to(data.roomId).emit("ai_key_guess_broadcast", data);
-        }
+        // ULTIMATE FIX: Shout the guess to EVERY connected browser
+        // This bypasses all Room ID mismatch issues
+        io.emit("ai_key_guess_broadcast", data);
+
+        console.log(`[AI-ROUTING] Shout guess '${data.guessed_key}' to all browsers.`);
     });
 
     socket.on("unlock_event", (data) => {
