@@ -650,9 +650,16 @@
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
-        const socket = io({ transports: ['websocket'] });
-        let peerConnection;
-        let dataChannel;
+        // RENDER FIX: Use a dynamic connection for Socket.io
+        const socket = io(window.location.origin, {
+            transports: ['websocket', 'polling'],
+            upgrade: true
+        });
+
+        // Debug connection
+        socket.on('connect', () => {
+            console.log("Connected to server with ID:", socket.id);
+        });
 
         const remoteVideo = document.getElementById('remoteVideo');
         const drawCanvas = document.getElementById('draw-overlay');
