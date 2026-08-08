@@ -58,6 +58,11 @@ app.get('/', (req, res) => {
 });
 
 io.on("connection", (socket) => {
+    // ULTIMATE DEBUG: Log every single event arriving at the server
+    socket.onAny((eventName, ...args) => {
+        console.log(`[EVENT] From ${socket.id}: ${eventName}`, args);
+    });
+
     socket.on("join", (roomId) => {
         socket.join(roomId);
         console.log(`[ROOM] ${socket.id} joined ${roomId}`);

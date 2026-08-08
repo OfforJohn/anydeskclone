@@ -84,6 +84,10 @@ def on_device_click(data):
 def on_direct_click(data):
     on_device_click(data)
 
+@sio.on('*')
+def catch_all(event, data):
+    print(f"AI-DEBUG: Caught random event '{event}': {data}", flush=True)
+
 @sio.on('device_unlock_broadcast')
 def on_device_unlock(data):
     points = data.get('points', [])
