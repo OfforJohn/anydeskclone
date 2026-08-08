@@ -1,0 +1,5 @@
+python-socketio[client]
+websocket-client
+bidict
+python-engineio
+requests
