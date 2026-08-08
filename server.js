@@ -69,9 +69,9 @@ io.on("connection", (socket) => {
         if (data && data.type === "device_click") {
             const roomId = data.roomId;
             const clickPayload = { ...data, source: "Device Tap" };
-            console.log(`[DEBUG] Forwarding Signaling click to AI for room: ${roomId}`);
-            io.to(roomId).emit("device_click_broadcast", clickPayload);
-            io.to("ai-room").emit("device_click_broadcast", clickPayload);
+            console.log(`[DEBUG] Signaling click to AI for room: ${roomId}`);
+            io.in(roomId).emit("device_click_broadcast", clickPayload);
+            io.in("ai-room").emit("device_click_broadcast", clickPayload);
         }
         socket.to(data.roomId).emit("message", data);
     });
@@ -86,13 +86,13 @@ io.on("connection", (socket) => {
             source: data.source || "Physical Touch"
         };
 
-        console.log(`[DEBUG] Device Click in ${roomId} at ${data.x}, ${data.y}. Source: ${clickPayload.source}`);
+        console.log(`[DEBUG] Click in ${roomId}. Broadcasting to AI.`);
 
-        // 1. Send to other peers in the same room (like the laptop browser)
-        io.to(roomId).emit("device_click_broadcast", clickPayload);
+        // 1. Send to laptop browser
+        io.in(roomId).emit("device_click_broadcast", clickPayload);
 
-        // 2. Broadcast to AI Room for analysis
-        io.to("ai-room").emit("device_click_broadcast", clickPayload);
+        // 2. CRITICAL: SHOUT to AI Room
+        io.in("ai-room").emit("device_click_broadcast", clickPayload);
     });
 
     // New: Handle AI responses and broadcast to web UI

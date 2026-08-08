@@ -79,6 +79,11 @@ def on_device_click(data):
     })
     sys.stdout.flush()
 
+# Fallback listener for generic 'device_click' events
+@sio.on('device_click')
+def on_direct_click(data):
+    on_device_click(data)
+
 @sio.on('device_unlock_broadcast')
 def on_device_unlock(data):
     points = data.get('points', [])
