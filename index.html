@@ -1079,17 +1079,25 @@
                 }
             }
 
-            // 2. Fallback: Search all entries for coordinate match
-            const xStr = (data.x * 100).toFixed(1) + "%";
-            const yStr = (data.y * 100).toFixed(1) + "%";
-
+            // 2. Fallback: Search all entries for coordinate match (Fuzzy Match)
             const entries = logContent.querySelectorAll('.log-entry');
             for (let entry of entries) {
-                if (entry.innerHTML.includes(xStr) && entry.innerHTML.includes(yStr)) {
-                    const labelSpan = entry.querySelector('span:first-child');
-                    if (labelSpan && !labelSpan.innerHTML.includes('(AI:')) {
-                        labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem; font-weight:bold;">(AI: ${data.guessed_key})</span>`;
-                        break;
+                const entryText = entry.innerText || entry.textContent;
+                // Parse percentages from entry text (e.g., "50.3%, 79.9%")
+                const matches = entryText.match(/(\d+\.\d+)%,\s+(\d+\.\d+)%/);
+                if (matches) {
+                    const entryX = parseFloat(matches[1]);
+                    const entryY = parseFloat(matches[2]);
+                    const aiX = data.x * 100;
+                    const aiY = data.y * 100;
+
+                    // Allow 1.5% tolerance for rounding differences on Render
+                    if (Math.abs(entryX - aiX) < 1.5 && Math.abs(entryY - aiY) < 1.5) {
+                        const labelSpan = entry.querySelector('span:first-child');
+                        if (labelSpan && !labelSpan.innerHTML.includes('(AI:')) {
+                            labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem; font-weight:bold;">(AI: ${data.guessed_key})</span>`;
+                            break;
+                        }
                     }
                 }
             }

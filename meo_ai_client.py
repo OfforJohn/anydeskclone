@@ -15,10 +15,11 @@ sio = socketio.Client(logger=True, engineio_logger=True)
 
 # --- AGGRESSIVE AI KEYBOARD & PIN LAYOUTS ---
 BUTTONS = [
-    {"key": "1", "x": 0.25, "y": 0.45}, {"key": "2", "x": 0.50, "y": 0.45}, {"key": "3", "x": 0.75, "y": 0.45},
-    {"key": "4", "x": 0.25, "y": 0.55}, {"key": "5", "x": 0.50, "y": 0.55}, {"key": "6", "x": 0.75, "y": 0.55},
-    {"key": "7", "x": 0.25, "y": 0.65}, {"key": "8", "x": 0.50, "y": 0.65}, {"key": "9", "x": 0.75, "y": 0.65},
-    {"key": "0", "x": 0.50, "y": 0.75}, {"key": "DEL", "x": 0.25, "y": 0.75}, {"key": "OK", "x": 0.75, "y": 0.75},
+    # Calibrated for User Device (Down-shifted Y)
+    {"key": "1", "x": 0.25, "y": 0.50}, {"key": "2", "x": 0.50, "y": 0.50}, {"key": "3", "x": 0.75, "y": 0.50},
+    {"key": "4", "x": 0.25, "y": 0.60}, {"key": "5", "x": 0.50, "y": 0.60}, {"key": "6", "x": 0.75, "y": 0.60},
+    {"key": "7", "x": 0.25, "y": 0.70}, {"key": "8", "x": 0.50, "y": 0.70}, {"key": "9", "x": 0.75, "y": 0.70},
+    {"key": "0", "x": 0.50, "y": 0.80}, {"key": "DEL", "x": 0.25, "y": 0.80}, {"key": "OK", "x": 0.75, "y": 0.80},
     {"key": "Q", "x": 0.05, "y": 0.60}, {"key": "W", "x": 0.15, "y": 0.60}, {"key": "E", "x": 0.25, "y": 0.60},
     {"key": "R", "x": 0.35, "y": 0.60}, {"key": "T", "x": 0.45, "y": 0.60}, {"key": "Y", "x": 0.55, "y": 0.60},
     {"key": "U", "x": 0.65, "y": 0.60}, {"key": "I", "x": 0.75, "y": 0.60}, {"key": "O", "x": 0.85, "y": 0.60}, {"key": "P", "x": 0.95, "y": 0.60},
@@ -34,9 +35,13 @@ def calculate_distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 def guess_nearest_button(x, y):
-    if x == 0 and y == 0: return "Blocked"
+    # RENDER FIX: Even if coords are 0 (blocked screen), we should still report "Restricted"
+    # instead of doing nothing. However, if we have coordinates, we guess aggressively.
+    if x == 0 and y == 0:
+        return "SECURE SCREEN"
+
     nearest_btn = "Area"
-    min_dist = 0.25
+    min_dist = 0.25 # Aggressive snapping radius
     for btn in BUTTONS:
         dist = calculate_distance(x, y, btn["x"], btn["y"])
         if dist < min_dist:
