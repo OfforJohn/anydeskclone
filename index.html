@@ -965,6 +965,7 @@
                 dataChannel.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
+                        console.log("DataChannel Message:", data);
                         if (data.type === 'click_feedback') {
                             displayCoordinates(data.x, data.y, "Laptop Tap");
                         } else if (data.type === 'device_click') {

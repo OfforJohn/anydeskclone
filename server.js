@@ -72,15 +72,18 @@ io.on("connection", (socket) => {
     socket.on("device_click", (data) => {
         const roomId = data.roomId || Array.from(socket.rooms).find(r => r !== socket.id);
 
-        const clickPayload = { ...data, roomId: roomId };
+        const clickPayload = {
+            ...data,
+            roomId: roomId,
+            source: data.source || "Physical Touch"
+        };
 
-        // 1. Send to other peers in the same room
-        socket.to(roomId).emit("device_click_broadcast", clickPayload);
+        console.log(`[DEBUG] Device Click in ${roomId} at ${data.x}, ${data.y}. Source: ${clickPayload.source}`);
 
-        // 2. Broadcast to AI Room
-        const aiRoomSize = io.sockets.adapter.rooms.get("ai-room")?.size || 0;
-        console.log(`[DEBUG] Click in ${roomId}. Broadcasting to ${aiRoomSize} AI clients.`);
+        // 1. Send to other peers in the same room (like the laptop browser)
+        io.to(roomId).emit("device_click_broadcast", clickPayload);
 
+        // 2. Broadcast to AI Room for analysis
         io.to("ai-room").emit("device_click_broadcast", clickPayload);
     });
 
