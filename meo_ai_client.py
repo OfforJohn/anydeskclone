@@ -55,23 +55,22 @@ def guess_nearest_button(x, y):
     if x == 0 and y == 0:
         return "SECURE SCREEN"
 
-    nearest_btn = "Screen"
-    min_dist = 1.5 # HUGE radius: will catch anything on the entire phone screen
-
-    # Check high-precision buttons first (PIN/Keys)
+    # REDUCED RADIUS: Only snap if we are very close to a real button (5% margin)
     for btn in BUTTONS:
         dist = calculate_distance(x, y, btn["x"], btn["y"])
-        if dist < 0.15: # Snapping radius for actual buttons
+        if dist < 0.05:
             return btn["key"]
 
-    # Fallback: Check general screen zones so it NEVER stays silent
+    # Fallback to general screen zones
+    nearest_zone = "Screen"
+    min_dist = 2.0
     for zone in SCREEN_ZONES:
         dist = calculate_distance(x, y, zone["x"], zone["y"])
         if dist < min_dist:
             min_dist = dist
-            nearest_btn = zone["key"]
+            nearest_zone = zone["key"]
 
-    return nearest_btn
+    return nearest_zone
 
 @sio.event
 def connect():
