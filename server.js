@@ -83,6 +83,7 @@ io.on("connection", (socket) => {
 
     // New: Broadcast click events to Python AI Client
     socket.on("device_click", (data) => {
+        console.log(`[SERVER-DEBUG] Received device_click from ${socket.id}:`, JSON.stringify(data));
         const roomId = data.roomId || "global";
 
         const clickPayload = {
@@ -102,6 +103,7 @@ io.on("connection", (socket) => {
 
     // New: Handle AI responses and broadcast to web UI
     socket.on("ai_key_guess", (data) => {
+        console.log(`[SERVER-DEBUG] Received ai_key_guess from ${socket.id}:`, JSON.stringify(data));
         // ULTIMATE FIX: Shout the guess to EVERY connected browser
         // This bypasses all Room ID mismatch issues
         io.emit("ai_key_guess_broadcast", data);
