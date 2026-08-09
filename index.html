@@ -983,19 +983,6 @@
                         const data = JSON.parse(event.data);
                         console.log("DataChannel Message:", data);
 
-                        // RESCUE: Ensure phone clicks are SENT TO SERVER
-                        if (data.type === 'device_click' || data.type === 'click_feedback') {
-                            const rid = roomIdInput.value || localStorage.getItem('lastRoomId');
-                            socket.emit("device_click", {
-                                roomId: rid,
-                                x: data.x,
-                                y: data.y,
-                                label: data.label || "Device Touch",
-                                clickId: Date.now()
-                            });
-                            debugUI(`Tap Sent to AI: ${rid}`, "#ffaa00");
-                        }
-
                         if (data.type === 'click_feedback') {
                             displayCoordinates(data.x, data.y, "Laptop Tap");
                         } else if (data.type === 'device_click') {
@@ -1039,11 +1026,13 @@
         function displayCoordinates(x, y, source = "Tap") {
             clickCount++;
 
-            // Send click to server for Python AI tracking
+            // Unified Click ID for both UI and AI
             const clickId = Date.now();
+
+            // Send click to server for Python AI tracking
             if (socket && socket.connected) {
                 const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
-                console.log(`[SOCKET] Sending click to AI. Room: ${roomId}, State: Connected`);
+                console.log(`[SOCKET] Sending click ${clickId} to AI for room: ${roomId}`);
                 socket.emit("device_click", {
                     roomId: roomId,
                     x: x,
@@ -1052,11 +1041,13 @@
                     source: source,
                     clickId: clickId
                 });
+                debugUI(`Tap Sent to AI: ${roomId}`, "#ffaa00");
             } else {
                 console.error("[SOCKET] NOT CONNECTED. Cannot send click to AI.");
             }
 
             const logContent = document.getElementById('click-log-content');
+            // ... rest of the function ...
 
             // Remove placeholder if it's the first click
             if (clickCount === 1) logContent.innerHTML = '';
