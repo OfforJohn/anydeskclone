@@ -83,22 +83,12 @@ io.on("connection", (socket) => {
 
     // New: Broadcast click events to Python AI Client
     socket.on("device_click", (data) => {
-        console.log(`[SERVER-DEBUG] Received device_click from ${socket.id}:`, JSON.stringify(data));
-        const roomId = data.roomId || "global";
+        console.log(`[SERVER-DEBUG] Click from ${socket.id}:`, data);
 
-        const clickPayload = {
-            ...data,
-            roomId: roomId,
-            source: data.source || "Physical Touch"
-        };
+        // 1. Send to EVERYONE including the AI and the browser (Full Broadcast)
+        io.emit("device_click_broadcast", data);
 
-        // 1. Send to laptop browser specifically
-        io.to(roomId).emit("device_click_broadcast", clickPayload);
-
-        // 2. ULTIMATE FIX: Broadcast to EVERYONE in ai-room (The AI)
-        io.emit("device_click_broadcast", clickPayload);
-
-        console.log(`[AI-ROUTING] Shout click from ${roomId} to all listeners.`);
+        console.log(`[SERVER-DEBUG] Global broadcast of click ${data.clickId}`);
     });
 
     // New: Handle AI responses and broadcast to web UI

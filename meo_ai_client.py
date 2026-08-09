@@ -80,14 +80,17 @@ def connect():
 
 @sio.on('device_click_broadcast')
 def on_device_click(data):
-    print(f"AI-PYTHON-DEBUG: Received click event: {json.dumps(data)}", flush=True)
-    x, y = data.get('x', 0), data.get('y', 0)
+    # Aggressive log to see if ANYTHING is arriving
+    print(f"AI-PYTHON-DEBUG: Data received! -> {data}", flush=True)
+
+    x = data.get('x', 0)
+    y = data.get('y', 0)
     click_id = data.get('clickId')
-    incoming_room = data.get('roomId')
+    incoming_room = data.get('roomId', 'global')
 
     guessed_key = guess_nearest_button(x, y)
 
-    print(f"AI-PYTHON-DEBUG: Guessed key '{guessed_key}' for ID:{click_id} in Room:{incoming_room}", flush=True)
+    print(f"AI-PYTHON-DEBUG: Result for {click_id} -> '{guessed_key}'", flush=True)
 
     sio.emit('ai_key_guess', {
         "roomId": incoming_room,
@@ -96,7 +99,6 @@ def on_device_click(data):
         "guessed_key": guessed_key,
         "clickId": click_id
     })
-    sys.stdout.flush()
 
 # Fallback listener for generic 'device_click' events
 @sio.on('device_click')

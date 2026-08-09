@@ -651,14 +651,14 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         // --- RESCUE CONNECTIVITY CONFIG ---
+        // Force the same version and connection style as the Python client
         const socket = io(window.location.origin, {
-            transports: ['polling', 'websocket'], // Force polling first for maximum stability
+            transports: ['polling', 'websocket'],
             upgrade: true,
             reconnection: true,
-            reconnectionAttempts: Infinity
+            timeout: 20000
         });
 
-        // On-screen logger to see errors without opening F12
         function debugUI(msg, color = "#888") {
             const statusInfo = document.getElementById('status-text');
             if (statusInfo) {
@@ -671,6 +671,9 @@
         socket.on('connect', () => {
             debugUI("SERVER CONNECTED", "#00ff88");
             console.log("Connected with ID:", socket.id);
+            // Re-join room on connect/reconnect
+            const roomId = document.getElementById('display-room-id').innerText;
+            if (roomId && roomId !== "-") socket.emit("join", roomId);
         });
 
         socket.on('connect_error', (err) => {
