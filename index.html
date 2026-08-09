@@ -648,15 +648,14 @@
         </div>
     </main>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        // --- RESCUE CONNECTIVITY CONFIG ---
-        // Force the same version and connection style as the Python client
-        const socket = io(window.location.origin, {
+        // --- RESCUE CONNECTIVITY CONFIG V2 ---
+        const socket = io({
             transports: ['polling', 'websocket'],
             upgrade: true,
             reconnection: true,
-            timeout: 20000
+            path: '/socket.io/'
         });
 
         function debugUI(msg, color = "#888") {
