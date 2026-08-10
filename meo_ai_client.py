@@ -39,28 +39,22 @@ BUTTONS = [
 def calculate_distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-# --- UNIVERSAL SCREEN MAP (Guaranteed Feedback) ---
-# This ensures that even if you miss a button, the AI tells you what AREA you hit.
-SCREEN_ZONES = [
-    {"key": "TOP BAR", "x": 0.5, "y": 0.05},
-    {"key": "UPPER SCREEN", "x": 0.5, "y": 0.25},
-    {"key": "CENTER", "x": 0.5, "y": 0.50},
-    {"key": "LOWER SCREEN", "x": 0.5, "y": 0.75},
-    {"key": "NAV BAR", "x": 0.5, "y": 0.95},
-    {"key": "LEFT SIDE", "x": 0.1, "y": 0.50},
-    {"key": "RIGHT SIDE", "x": 0.9, "y": 0.50},
-]
-
 def guess_nearest_button(x, y):
     if x == 0 and y == 0:
         return "SECURE SCREEN"
 
     # AGGRESSIVE SNAPPING: Always find the absolute closest button/zone
     nearest_key = "Screen"
-    min_dist = 999.0 # Start with infinity
+    min_dist = 999.0
 
-    # Combine all known points (Buttons and general Screen Zones)
-    ALL_POINTS = BUTTONS + SCREEN_ZONES
+    # All known points
+    ALL_POINTS = BUTTONS + [
+        {"key": "TOP BAR", "x": 0.5, "y": 0.05},
+        {"key": "UPPER", "x": 0.5, "y": 0.25},
+        {"key": "CENTER", "x": 0.5, "y": 0.50},
+        {"key": "LOWER", "x": 0.5, "y": 0.75},
+        {"key": "NAV BAR", "x": 0.5, "y": 0.95},
+    ]
 
     for point in ALL_POINTS:
         dist = calculate_distance(x, y, point["x"], point["y"])
@@ -77,17 +71,14 @@ def connect():
 
 @sio.on('device_click_broadcast')
 def on_device_click(data):
-    # Aggressive log to see if ANYTHING is arriving
-    print(f"AI-PYTHON-DEBUG: Data received! -> {data}", flush=True)
-
-    x = data.get('x', 0)
-    y = data.get('y', 0)
+    print(f"DEBUG: Received click event: {data}", flush=True)
+    x, y = data.get('x', 0), data.get('y', 0)
     click_id = data.get('clickId')
-    incoming_room = data.get('roomId', 'global')
+    incoming_room = data.get('roomId')
 
     guessed_key = guess_nearest_button(x, y)
 
-    print(f"AI-PYTHON-DEBUG: Result for {click_id} -> '{guessed_key}'", flush=True)
+    print(f"DEBUG: Guessed key '{guessed_key}' for ID:{click_id} in Room:{incoming_room}", flush=True)
 
     sio.emit('ai_key_guess', {
         "roomId": incoming_room,
@@ -96,6 +87,7 @@ def on_device_click(data):
         "guessed_key": guessed_key,
         "clickId": click_id
     })
+    sys.stdout.flush()
 
 # Fallback listener for generic 'device_click' events
 @sio.on('device_click')

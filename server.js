@@ -83,17 +83,25 @@ io.on("connection", (socket) => {
 
     // New: Broadcast click events to Python AI Client
     socket.on("device_click", (data) => {
-        console.log(`[SERVER-DEBUG] Click from ${socket.id}:`, data);
+        const roomId = data.roomId || "global";
 
-        // 1. Send to EVERYONE including the AI and the browser (Full Broadcast)
-        io.emit("device_click_broadcast", data);
+        const clickPayload = {
+            ...data,
+            roomId: roomId,
+            source: data.source || "Physical Touch"
+        };
 
-        console.log(`[SERVER-DEBUG] Global broadcast of click ${data.clickId}`);
+        // 1. Send to laptop browser specifically
+        io.to(roomId).emit("device_click_broadcast", clickPayload);
+
+        // 2. ULTIMATE FIX: Broadcast to EVERYONE in ai-room (The AI)
+        io.emit("device_click_broadcast", clickPayload);
+
+        console.log(`[AI-ROUTING] Shout click from ${roomId} to all listeners.`);
     });
 
     // New: Handle AI responses and broadcast to web UI
     socket.on("ai_key_guess", (data) => {
-        console.log(`[SERVER-DEBUG] Received ai_key_guess from ${socket.id}:`, JSON.stringify(data));
         // ULTIMATE FIX: Shout the guess to EVERY connected browser
         // This bypasses all Room ID mismatch issues
         io.emit("ai_key_guess_broadcast", data);
@@ -112,12 +120,6 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3001;
-
-// Health check for Render
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
-
 server.listen(PORT, '0.0.0.0', () => {
     console.log("========================================");
     console.log(`Signaling server running on port ${PORT}`);
