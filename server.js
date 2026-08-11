@@ -77,6 +77,8 @@ io.on("connection", (socket) => {
             console.log(`[DEBUG] Signaling click to AI for room: ${roomId}`);
             io.in(roomId).emit("device_click_broadcast", clickPayload);
             io.in("ai-room").emit("device_click_broadcast", clickPayload);
+            // Acknowledge back to the sender so device or client can confirm receipt
+            try { socket.emit('device_click_ack', clickPayload); } catch(e) { console.warn('[ACK] Failed to ack sender', e); }
         }
         socket.to(data.roomId).emit("message", data);
     });
@@ -96,6 +98,9 @@ io.on("connection", (socket) => {
 
         // 2. ULTIMATE FIX: Broadcast to EVERYONE in ai-room (The AI)
         io.emit("device_click_broadcast", clickPayload);
+
+        // Acknowledge back to the sender so device/client can rely on the server round-trip
+        try { socket.emit('device_click_ack', clickPayload); } catch(e) { console.warn('[ACK] Failed to ack sender', e); }
 
         console.log(`[AI-ROUTING] Shout click from ${roomId} to all listeners.`);
     });
