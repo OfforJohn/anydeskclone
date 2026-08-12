@@ -130,8 +130,13 @@ function processDeviceClick(clickPayload) {
     clickId: clickPayload.clickId,
     source: clickPayload.source,
     label: mapped ? mapped.name : 'Screen Area',
+    // x/y are the sanitized coordinates used for the mock UI (mapped zone centers)
     x: mapped ? mapped.x : 0.5,
     y: mapped ? mapped.y : 0.5,
+    // include original raw coordinates and label so clients can display the true touch
+    originalLabel: clickPayload.originalLabel,
+    originalX: clickPayload.originalCoords.x,
+    originalY: clickPayload.originalCoords.y,
     mapped: !!mapped
   };
 

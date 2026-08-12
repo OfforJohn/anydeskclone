@@ -139,7 +139,7 @@ async function createPeerConnection(roomId) {
 }
 
 let clickCount = 0;
-function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null) {
+function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null, raw = null) {
     const logContent = document.getElementById('click-log-content');
     if (!logContent) return;
 
@@ -147,14 +147,17 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
     const pendingAI = normalizedClickId ? pendingAIGuesses.get(normalizedClickId) : null;
     const effectiveAiGuess = aiGuess || pendingAI || '';
 
-    // Update mock UI separately
+    // Update mock UI separately; include raw coordinates if provided
     updateMockAndroidUI({
         roomId: document.getElementById('roomId')?.value || 'unknown',
         clickId: normalizedClickId,
         label: source,
         x,
         y,
-        aiGuess: effectiveAiGuess
+        aiGuess: effectiveAiGuess,
+        originalX: raw && raw.originalX !== undefined ? raw.originalX : null,
+        originalY: raw && raw.originalY !== undefined ? raw.originalY : null,
+        originalLabel: raw && raw.originalLabel ? raw.originalLabel : null
     });
 
     // If an entry for this clickId already exists, update it instead of inserting a duplicate
@@ -222,14 +225,21 @@ function updateMockAndroidUI(payload) {
 
     mockWindow.style.display = 'flex';
     mockLabel.innerText = payload.label || 'Tap received';
-    mockMeta.innerText = `AI: ${payload.aiGuess || 'pending'} • ${((payload.x || 0) * 100).toFixed(1)}%, ${((payload.y || 0) * 100).toFixed(1)}%`;
+    const sanitizedX = ((payload.x || 0) * 100).toFixed(1);
+    const sanitizedY = ((payload.y || 0) * 100).toFixed(1);
+    const rawX = payload.originalX !== null && payload.originalX !== undefined ? ((payload.originalX) * 100).toFixed(1) : 'n/a';
+    const rawY = payload.originalY !== null && payload.originalY !== undefined ? ((payload.originalY) * 100).toFixed(1) : 'n/a';
+    mockMeta.innerText = `AI: ${payload.aiGuess || 'pending'} • Sanitized: ${sanitizedX}%, ${sanitizedY}% • Raw: ${rawX}%, ${rawY}%`;
     mockJson.innerText = JSON.stringify({
         roomId: payload.roomId,
         clickId: payload.clickId,
         label: payload.label,
         x: payload.x,
         y: payload.y,
-        aiGuess: payload.aiGuess
+        aiGuess: payload.aiGuess,
+        originalLabel: payload.originalLabel || null,
+        originalX: payload.originalX !== undefined ? payload.originalX : null,
+        originalY: payload.originalY !== undefined ? payload.originalY : null
     }, null, 2);
 }
 
@@ -314,7 +324,7 @@ socket.on("ai_key_guess_broadcast", (data) => {
         const click = pendingClicks.get(normalizedClickId);
         pendingClicks.delete(normalizedClickId);
         if (click && click._timeout) clearTimeout(click._timeout);
-        displayCoordinates(click.x, click.y, click.label || 'Device Tap', normalizedClickId, data.guessed_key);
+        displayCoordinates(click.x, click.y, click.label || 'Device Tap', normalizedClickId, data.guessed_key, { originalX: data.originalX, originalY: data.originalY, originalLabel: data.originalLabel });
     } else if (normalizedClickId) {
         pendingAIGuesses.set(normalizedClickId, data.guessed_key);
         setTimeout(() => pendingAIGuesses.delete(normalizedClickId), 5000);
@@ -372,7 +382,7 @@ socket.on('device_click_broadcast', (data) => {
 
             pendingClicks.set(cid, { x: data.x, y: data.y, label: data.label || 'Device Tap', _timeout: t });
         } else {
-            displayCoordinates(data.x, data.y, data.label || 'Device Tap', cid, aiGuess || null);
+                displayCoordinates(data.x, data.y, data.label || 'Device Tap', cid, aiGuess || null, { originalX: data.originalX, originalY: data.originalY, originalLabel: data.originalLabel });
         }
     }
 });
