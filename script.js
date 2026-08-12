@@ -284,6 +284,26 @@ socket.on("ai_key_guess_broadcast", (data) => {
         aiSuggestionText.innerText = data.guessed_key;
         aiSuggestion.style.display = 'block';
     }
+
+    // Developer helper: duplicate an AI guess as a synthetic welcome message
+    // so you can visually verify AI routing without touching the device.
+    try {
+        const welcomePayload = {
+            roomId: data.roomId || (document.getElementById('roomId')?.value || 'unknown'),
+            clickId: `welcome-${Date.now()}`,
+            label: 'WELCOME',
+            x: 0.5,
+            y: 0.05,
+            aiGuess: 'Welcome John'
+        };
+        // Log it in the raw payload panel for traceability
+        logRawPayload('synthetic_welcome', welcomePayload);
+        // Also show it in the mock UI briefly
+        mockPayloadByClickId.set(welcomePayload.clickId, welcomePayload);
+        updateMockAndroidUI(welcomePayload);
+    } catch (e) {
+        console.warn('[SYNTHETIC] failed to create welcome payload', e);
+    }
 });
 
 socket.on('device_click_broadcast', (data) => {
