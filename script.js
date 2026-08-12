@@ -131,13 +131,78 @@ function drawAIElement(x, y, label) {
 
 function showRemoteClickIndicator(x, y, label = 'Tap') {
     if (!remoteContainer) return;
+    // x,y can be either normalized relative-to-intrinsic-video (0..1)
+    // or normalized relative-to-element (0..1). Caller can pass true
+    // for isElementRelative as the 4th arg; default is false (intrinsic).
+    const isElementRelative = arguments.length >= 4 ? !!arguments[3] : false;
+
+    let percentX = x;
+    let percentY = y;
+
+    if (!isElementRelative && remoteVideo && remoteVideo.videoWidth && remoteVideo.videoHeight) {
+        try {
+            const mapped = mapNormalizedToVideo(x, y, remoteVideo);
+            if (mapped && typeof mapped.percentX === 'number') {
+                percentX = mapped.percentX;
+                percentY = mapped.percentY;
+            }
+        } catch (e) {
+            console.warn('[MAP] mapping failed, falling back to raw percents', e);
+        }
+    }
+
+    // clamp
+    percentX = Math.max(0, Math.min(1, percentX));
+    percentY = Math.max(0, Math.min(1, percentY));
+
     const indicator = document.createElement('div');
     indicator.className = 'remote-tap-indicator';
     indicator.title = label;
-    indicator.style.left = `${(x * 100).toFixed(1)}%`;
-    indicator.style.top = `${(y * 100).toFixed(1)}%`;
+    indicator.style.left = `${(percentX * 100).toFixed(1)}%`;
+    indicator.style.top = `${(percentY * 100).toFixed(1)}%`;
     remoteContainer.appendChild(indicator);
     setTimeout(() => indicator.remove(), 800);
+}
+
+// Map normalized intrinsic video coordinates (0..1) to percent coordinates
+// relative to the video's DOM bounding box. Handles object-fit: contain/cover.
+function mapNormalizedToVideo(normX, normY, videoElem) {
+    if (!videoElem) return null;
+    const rect = videoElem.getBoundingClientRect();
+    const style = getComputedStyle(videoElem);
+    const objectFit = style.objectFit || 'contain';
+    const vw = videoElem.videoWidth || rect.width;
+    const vh = videoElem.videoHeight || rect.height;
+    if (!vw || !vh) return { percentX: normX, percentY: normY };
+
+    const intrinsicAspect = vw / vh;
+    const elemAspect = rect.width / rect.height;
+
+    let renderedW, renderedH, offsetX = 0, offsetY = 0, scale;
+
+    if (objectFit === 'cover') {
+        scale = Math.max(rect.width / vw, rect.height / vh);
+        renderedW = vw * scale;
+        renderedH = vh * scale;
+        offsetX = (rect.width - renderedW) / 2;
+        offsetY = (rect.height - renderedH) / 2;
+    } else {
+        // 'contain' and default
+        scale = Math.min(rect.width / vw, rect.height / vh);
+        renderedW = vw * scale;
+        renderedH = vh * scale;
+        offsetX = (rect.width - renderedW) / 2;
+        offsetY = (rect.height - renderedH) / 2;
+    }
+
+    // Coordinates in pixels relative to element's top-left
+    const px = offsetX + normX * renderedW;
+    const py = offsetY + normY * renderedH;
+
+    // Convert back to percent relative to element box
+    const percentX = px / rect.width;
+    const percentY = py / rect.height;
+    return { xPx: px + rect.left, yPx: py + rect.top, percentX, percentY };
 }
 
 // --- PEER CONNECTION ---
@@ -183,7 +248,7 @@ async function createPeerConnection(roomId) {
 }
 
 let clickCount = 0;
-function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null) {
+function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null, isElementRelative = false) {
     const logContent = document.getElementById('click-log-content');
     if (!logContent) return;
 
@@ -195,7 +260,7 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
     drawAIElement(x, y, effectiveAiGuess || source);
     // Also show a transient indicator on the main remote container
     try {
-        showRemoteClickIndicator(x, y, effectiveAiGuess || source);
+        showRemoteClickIndicator(x, y, effectiveAiGuess || source, !!isElementRelative);
     } catch (e) {
         console.warn('[UI] showRemoteClickIndicator failed', e);
     }
@@ -254,6 +319,28 @@ socket.on('device_click_broadcast', (data) => {
     }
 });
 
+// Visualizer-first preview event — server sends this to ai-room so visualizers
+// can display the tap first and then forward to the main room when ready.
+socket.on('device_click_for_visualizer', (data) => {
+    console.log('[CLIENT] device_click_for_visualizer', data);
+    if (!aiReconstructionActive) startAIRenderLoop();
+    const drawX = (data.originalX !== undefined && data.originalX !== null) ? data.originalX : data.x;
+    const drawY = (data.originalY !== undefined && data.originalY !== null) ? data.originalY : data.y;
+
+    // Show on visualizer immediately
+    if (typeof drawX === 'number' && typeof drawY === 'number') {
+        // Label uses sanitized preview label from server
+        displayCoordinates(drawX, drawY, data.label || 'Preview', data.clickId);
+    }
+
+    // Forward to main room after a short delay so visualizer appears first
+    setTimeout(() => {
+        try {
+            socket.emit('device_click_forward', { roomId: data.roomId, uiPayload: data });
+        } catch (e) { console.warn('[CLIENT] failed to forward preview', e); }
+    }, 150);
+});
+
 function getOrdinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
 function startSharing() {
@@ -265,6 +352,8 @@ function startSharing() {
     document.getElementById('display-room-id').innerText = roomId;
     dinoLoader.style.display = 'flex';
     socket.emit("join", roomId);
+    // Also join the AI room so this client receives raw clicks for the visualizer
+    socket.emit("join", 'ai-room');
     createPeerConnection(roomId);
 }
 
@@ -363,8 +452,9 @@ function handleInteraction(e, element) {
     // Render locally immediately so the AI visualizer captures where the user clicked
     const localClickId = `local-${Date.now()}`;
     try {
-        displayCoordinates(x, y, 'Local Click', localClickId);
-        showRemoteClickIndicator(x, y, 'Local Click');
+        // Treat these coords as element-relative to avoid remapping
+        displayCoordinates(x, y, 'Local Click', localClickId, null, true);
+        showRemoteClickIndicator(x, y, 'Local Click', true);
     } catch (e) {
         console.warn('[LOCAL-CAPTURE] failed to render local click', e);
     }

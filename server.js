@@ -139,10 +139,11 @@ function processDeviceClick(clickPayload) {
   };
 
   console.log(`[CLICK] room=${roomId} clickId=${cid} mapped=${uiPayload.mapped} label=${uiPayload.label}`);
-
-  // Emit sanitized UI payload to room, raw to AI listeners
-  io.to(roomId).emit('device_click_broadcast', uiPayload);
+  // Route clicks to AI/visualizer first (both raw and sanitised payloads)
+  // Raw click for AI engines
   io.to('ai-room').emit('device_click_broadcast', clickPayload);
+  // Sanitized UI preview for visualizers to show before forwarding to main room
+  io.to('ai-room').emit('device_click_for_visualizer', uiPayload);
   return uiPayload;
 }
 
@@ -260,6 +261,18 @@ io.on("connection", (socket) => {
     socket.on("unlock_event", (data) => {
         console.log(`[DEBUG] Unlock event in room ${data.roomId}`);
         io.to("ai-room").emit("device_unlock_broadcast", data);
+    });
+
+    // Listen for visualizer-forwarded clicks and broadcast them to the target room
+    socket.on('device_click_forward', (data) => {
+      try {
+        const room = data.roomId || data.uiPayload?.roomId || 'global';
+        const payload = data.uiPayload || data;
+        console.log(`[FORWARD] Forwarding click to room ${room}`, payload.clickId || payload.clickId);
+        io.to(room).emit('device_click_broadcast', payload);
+      } catch (e) {
+        console.warn('[FORWARD] Failed to forward click', e);
+      }
     });
 
     socket.on("disconnect", (reason) => {
