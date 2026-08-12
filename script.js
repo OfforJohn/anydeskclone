@@ -24,6 +24,11 @@ const remoteVideo = document.getElementById('remoteVideo');
 const remoteVideo2 = document.getElementById('remoteVideo2'); // Virtual video for AI
 const aiCanvas = document.getElementById('ai-canvas');
 const aiCtx = aiCanvas.getContext('2d');
+const aiOverlay = document.getElementById('draw-overlay-2');
+const aiOverlayCtx = aiOverlay ? aiOverlay.getContext('2d') : null;
+
+// Pulses storage for timed annotation rendering
+const aiPulses = [];
 
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
@@ -43,23 +48,58 @@ function startAIRenderLoop() {
     function render() {
         if (!aiReconstructionActive) return;
 
-        // Match canvas size to container
+        // Match canvas + overlay size to container
         if (aiCanvas.width !== aiCanvas.clientWidth) {
             aiCanvas.width = aiCanvas.clientWidth;
             aiCanvas.height = aiCanvas.clientHeight;
         }
+        if (aiOverlay && (aiOverlay.width !== aiOverlay.clientWidth)) {
+            aiOverlay.width = aiOverlay.clientWidth;
+            aiOverlay.height = aiOverlay.clientHeight;
+        }
 
-        // 1. Draw "Scan Lines" background
-        aiCtx.fillStyle = '#050505';
-        aiCtx.fillRect(0, 0, aiCanvas.width, aiCanvas.height);
+        // Draw video snapshot as background if available, otherwise draw scanlines
+        if (remoteVideo && remoteVideo.readyState >= 2) {
+            try {
+                aiCtx.drawImage(remoteVideo, 0, 0, aiCanvas.width, aiCanvas.height);
+            } catch (e) {
+                // fallback to scanlines if drawImage fails
+                aiCtx.fillStyle = '#050505';
+                aiCtx.fillRect(0, 0, aiCanvas.width, aiCanvas.height);
+            }
+        } else {
+            aiCtx.fillStyle = '#050505';
+            aiCtx.fillRect(0, 0, aiCanvas.width, aiCanvas.height);
+            aiCtx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
+            aiCtx.lineWidth = 1;
+            for (let i = 0; i < aiCanvas.height; i += 20) {
+                aiCtx.beginPath();
+                aiCtx.moveTo(0, i);
+                aiCtx.lineTo(aiCanvas.width, i);
+                aiCtx.stroke();
+            }
+        }
 
-        aiCtx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
-        aiCtx.lineWidth = 1;
-        for (let i = 0; i < aiCanvas.height; i += 20) {
-            aiCtx.beginPath();
-            aiCtx.moveTo(0, i);
-            aiCtx.lineTo(aiCanvas.width, i);
-            aiCtx.stroke();
+        // Render pulses on overlay with fade-out
+        if (aiOverlayCtx) {
+            aiOverlayCtx.clearRect(0, 0, aiOverlay.width, aiOverlay.height);
+            const now = Date.now();
+            for (let i = aiPulses.length - 1; i >= 0; i--) {
+                const p = aiPulses[i];
+                const age = (now - p.ts) / 800; // 0..1
+                if (age > 1) { aiPulses.splice(i, 1); continue; }
+                const alpha = 1 - age;
+                const rx = p.x * aiOverlay.width;
+                const ry = p.y * aiOverlay.height;
+                aiOverlayCtx.beginPath();
+                aiOverlayCtx.arc(rx, ry, 20 + 30 * age, 0, Math.PI * 2);
+                aiOverlayCtx.strokeStyle = `rgba(0,255,136,${0.9 * alpha})`;
+                aiOverlayCtx.lineWidth = 2;
+                aiOverlayCtx.stroke();
+                aiOverlayCtx.fillStyle = `rgba(0,255,136,${0.9 * alpha})`;
+                aiOverlayCtx.font = `${12 + 8 * (1 - age)}px monospace`;
+                aiOverlayCtx.fillText(p.label.toString().toUpperCase(), rx + 24, ry - 8);
+            }
         }
 
         requestAnimationFrame(render);
@@ -163,15 +203,29 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
 }
 
 socket.on("ai_key_guess_broadcast", (data) => {
+    console.log('[CLIENT] ai_key_guess_broadcast', data);
+    if (!aiReconstructionActive) startAIRenderLoop();
     const normalizedClickId = data.clickId ? String(data.clickId) : null;
+    const guess = data.guessed_key || data.guessedKey || data.guess || '';
+    const aiBadge = document.getElementById('ai-suggestion');
+    if (aiBadge) {
+        aiBadge.innerText = `AI: ${guess}`;
+        aiBadge.style.display = 'block';
+        setTimeout(() => { aiBadge.style.display = 'none'; }, 4000);
+    }
     if (normalizedClickId) {
-        pendingAIGuesses.set(normalizedClickId, data.guessed_key);
+        pendingAIGuesses.set(normalizedClickId, guess);
         // Refresh display if the click already arrived
-        displayCoordinates(data.x, data.y, "Device Tap", normalizedClickId, data.guessed_key);
+        displayCoordinates(data.x || 0, data.y || 0, "Device Tap", normalizedClickId, guess);
+    } else {
+        // Draw the guess even if no clickId (useful for heuristics)
+        displayCoordinates(data.x || 0, data.y || 0, "AI Guess", null, guess);
     }
 });
 
 socket.on('device_click_broadcast', (data) => {
+    console.log('[CLIENT] device_click_broadcast', data);
+    if (!aiReconstructionActive) startAIRenderLoop();
     if (typeof data.x === 'number' && typeof data.y === 'number') {
         displayCoordinates(data.x, data.y, data.label || 'Device Tap', data.clickId);
     }
