@@ -213,21 +213,26 @@ socket.on("ai_key_guess_broadcast", (data) => {
         aiBadge.style.display = 'block';
         setTimeout(() => { aiBadge.style.display = 'none'; }, 4000);
     }
+    const drawX = (data.originalX !== undefined && data.originalX !== null) ? data.originalX : (data.x || 0);
+    const drawY = (data.originalY !== undefined && data.originalY !== null) ? data.originalY : (data.y || 0);
     if (normalizedClickId) {
         pendingAIGuesses.set(normalizedClickId, guess);
-        // Refresh display if the click already arrived
-        displayCoordinates(data.x || 0, data.y || 0, "Device Tap", normalizedClickId, guess);
+        // Refresh display if the click already arrived (use original coords when available)
+        displayCoordinates(drawX, drawY, "Device Tap", normalizedClickId, guess);
     } else {
         // Draw the guess even if no clickId (useful for heuristics)
-        displayCoordinates(data.x || 0, data.y || 0, "AI Guess", null, guess);
+        displayCoordinates(drawX, drawY, "AI Guess", null, guess);
     }
 });
 
 socket.on('device_click_broadcast', (data) => {
     console.log('[CLIENT] device_click_broadcast', data);
     if (!aiReconstructionActive) startAIRenderLoop();
-    if (typeof data.x === 'number' && typeof data.y === 'number') {
-        displayCoordinates(data.x, data.y, data.label || 'Device Tap', data.clickId);
+    // Prefer original coordinates carried in the payload when available
+    const drawX = (data.originalX !== undefined && data.originalX !== null) ? data.originalX : data.x;
+    const drawY = (data.originalY !== undefined && data.originalY !== null) ? data.originalY : data.y;
+    if (typeof drawX === 'number' && typeof drawY === 'number') {
+        displayCoordinates(drawX, drawY, data.label || 'Device Tap', data.clickId);
     }
 });
 
