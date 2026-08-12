@@ -337,7 +337,23 @@ function handleInteraction(e, element) {
     const rect = element.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify({ type: 'click', x, y, clickId: Date.now() }));
+    // Render locally immediately so the AI visualizer captures where the user clicked
+    const localClickId = `local-${Date.now()}`;
+    try {
+        displayCoordinates(x, y, 'Local Click', localClickId);
+        showRemoteClickIndicator(x, y, 'Local Click');
+    } catch (e) {
+        console.warn('[LOCAL-CAPTURE] failed to render local click', e);
+    }
+
+    // Also forward the click to the device via the data channel, using the same clickId
+    if (dataChannel?.readyState === 'open') {
+        try {
+            dataChannel.send(JSON.stringify({ type: 'click', x, y, clickId: localClickId }));
+        } catch (e) {
+            console.warn('[DATACHANNEL] failed to send click', e);
+        }
+    }
 }
 
 remoteVideo.addEventListener('mousedown', (e) => handleInteraction(e, remoteVideo));
