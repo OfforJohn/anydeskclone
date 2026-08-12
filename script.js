@@ -21,106 +21,72 @@ let peerConnection;
 let dataChannel;
 
 const remoteVideo = document.getElementById('remoteVideo');
-const remoteVideo2 = document.getElementById('remoteVideo2');
-const remoteContainer = document.getElementById('remote-container');
-const remoteContainer2 = document.getElementById('remote-container-2');
-const drawCanvas = document.getElementById('draw-overlay');
-const drawCanvas2 = document.getElementById('draw-overlay-2');
-const drawCtx = drawCanvas.getContext('2d');
-const drawCtx2 = drawCanvas2.getContext('2d');
+const remoteVideo2 = document.getElementById('remoteVideo2'); // Virtual video for AI
+const aiCanvas = document.getElementById('ai-canvas');
+const aiCtx = aiCanvas.getContext('2d');
 
-const dinoLoader = document.getElementById('dino-loader');
-const dinoLoader2 = document.getElementById('dino-loader-2');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const roomIdInput = document.getElementById('roomId');
+const dinoLoader = document.getElementById('dino-loader');
+const dinoLoader2 = document.getElementById('dino-loader-2');
 
-const pinSimulator = document.getElementById('pin-simulator');
-const patternSimulator = document.getElementById('pattern-simulator');
-const unlockInput = document.getElementById('unlock-pin');
-
-let isPatternMode = false;
-let isPinMode = false;
-let patternPoints = [];
 const pendingAIGuesses = new Map();
 
-// --- INPUT TRACKING ---
-let isMouseDown = false;
-let startX, startY, startTime;
+// --- AI RECONSTRUCTION ENGINE ---
+let aiReconstructionActive = false;
 
-function getCoords(e, element) {
-    const rect = element.getBoundingClientRect();
-    return {
-        x: (e.clientX - rect.left) / rect.width,
-        y: (e.clientY - rect.top) / rect.height,
-        canvasX: e.clientX - rect.left,
-        canvasY: e.clientY - rect.top
-    };
-}
+function startAIRenderLoop() {
+    if (aiReconstructionActive) return;
+    aiReconstructionActive = true;
 
-function showRemoteClickIndicator(x, y, label = 'Tap', container = remoteContainer) {
-    if (!container) return;
-    const indicator = document.createElement('div');
-    indicator.className = 'remote-tap-indicator';
-    indicator.style.left = `${(x * 100).toFixed(1)}%`;
-    indicator.style.top = `${(y * 100).toFixed(1)}%`;
-    container.appendChild(indicator);
-    setTimeout(() => indicator.remove(), 800);
-}
+    function render() {
+        if (!aiReconstructionActive) return;
 
-function handleInteractionStart(e, element) {
-    if (element.style.display === 'none') return;
-    isMouseDown = true;
-    const coords = getCoords(e, element);
-    startX = coords.x; startY = coords.y; startTime = Date.now();
-
-    if (isPatternMode) {
-        patternPoints = [{ x: coords.x, y: coords.y }];
-        [drawCtx, drawCtx2].forEach(ctx => {
-            ctx.beginPath();
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = "#00ff88";
-            ctx.moveTo(coords.canvasX, coords.canvasY);
-        });
-    }
-}
-
-function handleInteractionMove(e, element) {
-    if (!isMouseDown) return;
-    const coords = getCoords(e, element);
-    if (isPatternMode) {
-        patternPoints.push({ x: coords.x, y: coords.y });
-        [drawCtx, drawCtx2].forEach(ctx => {
-            ctx.lineTo(coords.canvasX, coords.canvasY);
-            ctx.stroke();
-        });
-    }
-}
-
-function handleInteractionEnd(e, element) {
-    if (!isMouseDown) return;
-    isMouseDown = false;
-    const coords = getCoords(e, element);
-    const duration = Date.now() - startTime;
-    const dist = Math.sqrt(Math.pow(coords.x - startX, 2) + Math.pow(coords.y - startY, 2));
-
-    if (dataChannel?.readyState === 'open') {
-        if (isPatternMode && patternPoints.length > 5) {
-            dataChannel.send(JSON.stringify({ type: 'unlock', points: patternPoints }));
-            setTimeout(togglePatternMode, 1000);
-        } else if (dist < 0.01) {
-            dataChannel.send(JSON.stringify({ type: 'click', x: startX, y: startY, clickId: Date.now() }));
-        } else {
-            dataChannel.send(JSON.stringify({ type: 'swipe', x1: startX, y1: startY, x2: coords.x, y2: coords.y, duration: Math.max(duration, 100) }));
+        // Match canvas size to container
+        if (aiCanvas.width !== aiCanvas.clientWidth) {
+            aiCanvas.width = aiCanvas.clientWidth;
+            aiCanvas.height = aiCanvas.clientHeight;
         }
+
+        // 1. Draw "Scan Lines" background
+        aiCtx.fillStyle = '#050505';
+        aiCtx.fillRect(0, 0, aiCanvas.width, aiCanvas.height);
+
+        aiCtx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
+        aiCtx.lineWidth = 1;
+        for (let i = 0; i < aiCanvas.height; i += 20) {
+            aiCtx.beginPath();
+            aiCtx.moveTo(0, i);
+            aiCtx.lineTo(aiCanvas.width, i);
+            aiCtx.stroke();
+        }
+
+        requestAnimationFrame(render);
     }
+    render();
 }
 
-[remoteVideo, remoteVideo2].forEach(el => {
-    el.addEventListener('mousedown', (e) => handleInteractionStart(e, el));
-    window.addEventListener('mousemove', (e) => handleInteractionMove(e, el));
-    window.addEventListener('mouseup', (e) => handleInteractionEnd(e, el));
-});
+function drawAIElement(x, y, label) {
+    const realX = x * aiCanvas.width;
+    const realY = y * aiCanvas.height;
+
+    // Draw "Pulse" on AI Screen
+    aiCtx.beginPath();
+    aiCtx.arc(realX, realY, 30, 0, Math.PI * 2);
+    aiCtx.strokeStyle = '#00ff88';
+    aiCtx.lineWidth = 2;
+    aiCtx.stroke();
+
+    // Draw ID Tag
+    aiCtx.fillStyle = '#00ff88';
+    aiCtx.font = '10px monospace';
+    aiCtx.fillText(label.toUpperCase(), realX + 10, realY - 10);
+
+    // Draw Box
+    aiCtx.strokeStyle = 'rgba(0, 255, 136, 0.5)';
+    aiCtx.strokeRect(realX - 25, realY - 25, 50, 50);
+}
 
 // --- PEER CONNECTION ---
 async function createPeerConnection(roomId) {
@@ -135,10 +101,10 @@ async function createPeerConnection(roomId) {
             try {
                 const data = JSON.parse(event.data);
                 if (data.type === 'device_click' || data.type === 'click_feedback') {
-                    const rid = roomIdInput.value || localStorage.getItem('lastRoomId');
                     socket.emit("device_click", {
-                        roomId: rid, x: data.x, y: data.y,
-                        label: data.label || "Device Tap", clickId: data.clickId || Date.now()
+                        roomId: roomIdInput.value || localStorage.getItem('lastRoomId'),
+                        x: data.x, y: data.y, label: data.label || "Device Tap",
+                        clickId: data.clickId || Date.now()
                     });
                 }
             } catch (e) {}
@@ -148,12 +114,12 @@ async function createPeerConnection(roomId) {
     peerConnection.ontrack = (event) => {
         const stream = event.streams[0] || new MediaStream([event.track]);
         remoteVideo.srcObject = stream;
-        remoteVideo2.srcObject = stream;
         remoteVideo.style.display = 'block';
-        remoteVideo2.style.display = 'block';
         dinoLoader.style.display = 'none';
         dinoLoader2.style.display = 'none';
-        debugUI("VIDEOS ACTIVE", "#00ff88");
+
+        startAIRenderLoop();
+        debugUI("AI ENGINE LIVE", "#00ff88");
     };
 
     const offer = await peerConnection.createOffer({ offerToReceiveVideo: true });
@@ -164,51 +130,44 @@ async function createPeerConnection(roomId) {
     };
 }
 
-// --- UI HELPERS ---
 let clickCount = 0;
 function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null) {
     const logContent = document.getElementById('click-log-content');
     if (!logContent) return;
+
     const normalizedClickId = clickId ? String(clickId) : null;
     const pendingAI = normalizedClickId ? pendingAIGuesses.get(normalizedClickId) : null;
     const effectiveAiGuess = aiGuess || pendingAI || '';
+
+    // Draw on AI Canvas
+    drawAIElement(x, y, effectiveAiGuess || source);
 
     if (normalizedClickId) {
         const existing = logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`);
         if (existing) {
             const label = effectiveAiGuess ? `${source} (AI: ${effectiveAiGuess})` : source;
             existing.innerHTML = `<span><b>${existing.dataset.order}</b> ${label}:</span><span>${(x*100).toFixed(1)}%, ${(y*100).toFixed(1)}%</span>`;
-            if (normalizedClickId && pendingAIGuesses.has(normalizedClickId)) pendingAIGuesses.delete(normalizedClickId);
             return;
         }
     }
 
     if (clickCount === 0) logContent.innerHTML = '';
     clickCount++;
+
     const label = effectiveAiGuess ? `${source} (AI: ${effectiveAiGuess})` : source;
     const entry = document.createElement('div');
     entry.className = 'log-entry';
     if (normalizedClickId) { entry.setAttribute('data-click-id', normalizedClickId); entry.dataset.order = getOrdinal(clickCount); }
     entry.innerHTML = `<span><b>${getOrdinal(clickCount)}</b> ${label}:</span><span>${(x*100).toFixed(1)}%, ${(y*100).toFixed(1)}%</span>`;
     logContent.insertBefore(entry, logContent.firstChild);
-
-    showRemoteClickIndicator(x, y, label, remoteContainer);
-    showRemoteClickIndicator(x, y, label, remoteContainer2);
 }
 
 socket.on("ai_key_guess_broadcast", (data) => {
     const normalizedClickId = data.clickId ? String(data.clickId) : null;
-    const logContent = document.getElementById('click-log-content');
-    const matchedEntry = normalizedClickId ? logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`) : null;
-
-    if (matchedEntry) {
-        const labelSpan = matchedEntry.querySelector('span:first-child');
-        if (!labelSpan.innerHTML.includes('(AI:')) {
-            labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem; font-weight:bold;">(AI: ${data.guessed_key})</span>`;
-        }
-    } else if (normalizedClickId) {
+    if (normalizedClickId) {
         pendingAIGuesses.set(normalizedClickId, data.guessed_key);
-        setTimeout(() => pendingAIGuesses.delete(normalizedClickId), 5000);
+        // Refresh display if the click already arrived
+        displayCoordinates(data.x, data.y, "Device Tap", normalizedClickId, data.guessed_key);
     }
 });
 
@@ -228,9 +187,7 @@ function startSharing() {
     document.getElementById('active-info').style.display = 'block';
     document.getElementById('display-room-id').innerText = roomId;
     dinoLoader.style.display = 'flex';
-    dinoLoader2.style.display = 'flex';
     socket.emit("join", roomId);
-    updateStatus("Connecting...", false);
     createPeerConnection(roomId);
 }
 
@@ -238,9 +195,9 @@ function refreshConnection() {
     const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
     if (!roomId) return;
     if (peerConnection) peerConnection.close();
-    peerConnection = null; dataChannel = null;
-    remoteVideo.style.display = 'none'; remoteVideo2.style.display = 'none';
-    dinoLoader.style.display = 'flex'; dinoLoader2.style.display = 'flex';
+    peerConnection = null;
+    remoteVideo.style.display = 'none';
+    dinoLoader.style.display = 'flex';
     socket.emit("join", roomId);
     createPeerConnection(roomId);
 }
@@ -255,8 +212,7 @@ function updateStatus(status, isActive) {
 }
 
 function toggleMainPanel() {
-    const panel = document.getElementById('main-actions-panel');
-    panel.classList.toggle('expanded');
+    document.getElementById('main-actions-panel').classList.toggle('expanded');
 }
 
 function wakeDevice() {
@@ -266,51 +222,31 @@ function wakeDevice() {
 function toggleUnlockInput() {
     isPinMode = !isPinMode;
     const btn = document.getElementById('unlock-toggle');
-    if (isPinMode) {
-        pinSimulator.style.display = 'flex';
-        unlockInput.style.display = 'block';
-        btn.classList.add('active-mode');
-    } else {
-        pinSimulator.style.display = 'none';
-        unlockInput.style.display = 'none';
-        btn.classList.remove('active-mode');
-    }
+    document.getElementById('pin-simulator').style.display = isPinMode ? 'flex' : 'none';
+    document.getElementById('unlock-pin').style.display = isPinMode ? 'block' : 'none';
+    btn.classList.toggle('active-mode');
 }
 
 function sendUnlock() {
-    const pin = unlockInput.value;
+    const pin = document.getElementById('unlock-pin').value;
     if (pin && dataChannel?.readyState === 'open') {
         dataChannel.send(JSON.stringify({ type: 'unlock', pin: pin }));
         toggleUnlockInput();
-        unlockInput.value = "";
     }
 }
 
 function togglePatternMode() {
     isPatternMode = !isPatternMode;
-    const btn = document.getElementById('pattern-toggle');
-    if (isPatternMode) {
-        patternSimulator.style.display = 'flex';
-        btn.classList.add('active-mode');
-        [drawCanvas, drawCanvas2].forEach((cv, i) => {
-            const vid = i === 0 ? remoteVideo : remoteVideo2;
-            cv.width = vid.clientWidth;
-            cv.height = vid.clientHeight;
-            const ctx = cv.getContext('2d');
-            ctx.clearRect(0, 0, cv.width, cv.height);
-        });
-    } else {
-        patternSimulator.style.display = 'none';
-        btn.classList.remove('active-mode');
-    }
+    document.getElementById('pattern-toggle').classList.toggle('active-mode');
+    document.getElementById('pattern-simulator').style.display = isPatternMode ? 'flex' : 'none';
 }
 
 function toggleSecurityOverride() {
     const btn = document.getElementById('security-mode');
-    const isAct = btn.classList.toggle('active-mode');
-    if (isAct) {
-        [remoteVideo, remoteVideo2].forEach(v => { v.style.display = 'block'; v.style.background = '#111'; });
-        [dinoLoader, dinoLoader2].forEach(d => d.style.display = 'none');
+    if (btn.classList.toggle('active-mode')) {
+        remoteVideo.style.display = 'block';
+        remoteVideo.style.background = '#111';
+        dinoLoader.style.display = 'none';
     }
 }
 
@@ -340,3 +276,14 @@ socket.on("message", async (data) => {
         await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
     }
 });
+
+// Coordinate conversion for clicks
+function handleInteraction(e, element) {
+    if (element.style.display === 'none') return;
+    const rect = element.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify({ type: 'click', x, y, clickId: Date.now() }));
+}
+
+remoteVideo.addEventListener('mousedown', (e) => handleInteraction(e, remoteVideo));
