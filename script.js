@@ -40,10 +40,6 @@ const KNOWN_TAP_ZONES = [
 ];
 
 const mockPayloadByClickId = new Map();
-// Track whether we've shown the synthetic welcome per room to avoid flooding
-const syntheticWelcomeShown = new Set();
-// Toggle for synthetic welcome messages (persisted)
-let syntheticWelcomeEnabled = localStorage.getItem('syntheticWelcomeEnabled') !== 'false';
 
 function distance(x1, y1, x2, y2) {
     return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
@@ -146,28 +142,40 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
     const normalizedClickId = clickId ? String(clickId) : null;
     const pendingAI = normalizedClickId ? pendingAIGuesses.get(normalizedClickId) : null;
     const effectiveAiGuess = aiGuess || pendingAI || '';
+    const displayX = raw && raw.originalX !== undefined ? raw.originalX : x;
+    const displayY = raw && raw.originalY !== undefined ? raw.originalY : y;
 
-    // Update mock UI separately; include raw coordinates if provided
+    // Update mock UI separately
     updateMockAndroidUI({
         roomId: document.getElementById('roomId')?.value || 'unknown',
         clickId: normalizedClickId,
         label: source,
-        x,
-        y,
+        x: displayX,
+        y: displayY,
         aiGuess: effectiveAiGuess,
-        originalX: raw && raw.originalX !== undefined ? raw.originalX : null,
-        originalY: raw && raw.originalY !== undefined ? raw.originalY : null,
-        originalLabel: raw && raw.originalLabel ? raw.originalLabel : null
+        originalLabel: raw?.originalLabel,
+        originalX: raw?.originalX,
+        originalY: raw?.originalY
     });
 
     // If an entry for this clickId already exists, update it instead of inserting a duplicate
     if (normalizedClickId) {
-        mockPayloadByClickId.set(normalizedClickId, { roomId: document.getElementById('roomId')?.value || 'unknown', clickId: normalizedClickId, label: source, x, y, aiGuess: effectiveAiGuess });
+        mockPayloadByClickId.set(normalizedClickId, {
+            roomId: document.getElementById('roomId')?.value || 'unknown',
+            clickId: normalizedClickId,
+            label: source,
+            x,
+            y,
+            aiGuess: effectiveAiGuess,
+            originalLabel: raw?.originalLabel,
+            originalX: raw?.originalX,
+            originalY: raw?.originalY
+        });
         const existing = logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`);
         if (existing) {
             const label = formatTrackerLabel(source, effectiveAiGuess);
-            const xPct = (x * 100).toFixed(1);
-            const yPct = (y * 100).toFixed(1);
+            const xPct = (displayX * 100).toFixed(1);
+            const yPct = (displayY * 100).toFixed(1);
             existing.innerHTML = `
                 <span><b>${existing.querySelector('span:first-child') ? existing.dataset.order : getOrdinal(clickCount)}</b> ${label}:</span>
                 <span>${xPct}%, ${yPct}%</span>
@@ -175,7 +183,7 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
             const coordInfo = document.getElementById('coord-info');
             coordInfo.innerText = `${label}: ${xPct}%, ${yPct}%`;
             coordInfo.style.display = 'block';
-            showRemoteClickIndicator(x, y, label);
+            showRemoteClickIndicator(displayX, displayY, label);
             if (normalizedClickId && pendingAIGuesses.has(normalizedClickId)) pendingAIGuesses.delete(normalizedClickId);
             return;
         }
@@ -185,8 +193,8 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
     clickCount++;
 
     const label = formatTrackerLabel(source, aiGuess || (clickId ? pendingAIGuesses.get(clickId) : null));
-    const xPct = (x * 100).toFixed(1);
-    const yPct = (y * 100).toFixed(1);
+    const xPct = (displayX * 100).toFixed(1);
+    const yPct = (displayY * 100).toFixed(1);
 
     const entry = document.createElement('div');
     entry.className = 'log-entry';
@@ -208,12 +216,7 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
     const coordInfo = document.getElementById('coord-info');
     coordInfo.innerText = `${label}: ${xPct}%, ${yPct}%`;
     coordInfo.style.display = 'block';
-    showRemoteClickIndicator(x, y, label);
-}
-
-function formatTrackerLabel(source, aiGuess) {
-    if (!aiGuess) return source;
-    return `${source} (AI: ${aiGuess})`;
+    showRemoteClickIndicator(displayX, displayY, label);
 }
 
 function updateMockAndroidUI(payload) {
@@ -223,63 +226,23 @@ function updateMockAndroidUI(payload) {
     const mockWindow = document.getElementById('mock-ui-window');
     if (!mockLabel || !mockMeta || !mockJson || !mockWindow) return;
 
+    const displayX = payload.originalX !== undefined && payload.originalX !== null ? payload.originalX : payload.x;
+    const displayY = payload.originalY !== undefined && payload.originalY !== null ? payload.originalY : payload.y;
+
     mockWindow.style.display = 'flex';
     mockLabel.innerText = payload.label || 'Tap received';
-    const sanitizedX = ((payload.x || 0) * 100).toFixed(1);
-    const sanitizedY = ((payload.y || 0) * 100).toFixed(1);
-    const rawX = payload.originalX !== null && payload.originalX !== undefined ? ((payload.originalX) * 100).toFixed(1) : 'n/a';
-    const rawY = payload.originalY !== null && payload.originalY !== undefined ? ((payload.originalY) * 100).toFixed(1) : 'n/a';
-    mockMeta.innerText = `AI: ${payload.aiGuess || 'pending'} • Sanitized: ${sanitizedX}%, ${sanitizedY}% • Raw: ${rawX}%, ${rawY}%`;
+    mockMeta.innerText = `AI: ${payload.aiGuess || 'pending'} • ${((displayX || 0) * 100).toFixed(1)}%, ${((displayY || 0) * 100).toFixed(1)}%`;
     mockJson.innerText = JSON.stringify({
         roomId: payload.roomId,
         clickId: payload.clickId,
         label: payload.label,
-        x: payload.x,
-        y: payload.y,
+        x: displayX,
+        y: displayY,
         aiGuess: payload.aiGuess,
         originalLabel: payload.originalLabel || null,
         originalX: payload.originalX !== undefined ? payload.originalX : null,
         originalY: payload.originalY !== undefined ? payload.originalY : null
     }, null, 2);
-}
-
-function updateWelcomeUI(payload) {
-    const wLabel = document.getElementById('welcome-ui-label');
-    const wMeta = document.getElementById('welcome-ui-meta');
-    const wJson = document.getElementById('welcome-ui-json');
-    const wWindow = document.getElementById('welcome-ui-window');
-    if (!wLabel || !wMeta || !wJson || !wWindow) return;
-
-    wWindow.style.display = 'flex';
-    wLabel.innerText = payload.label || 'Welcome';
-    wMeta.innerText = `${payload.aiGuess || ''} • ${((payload.x || 0) * 100).toFixed(1)}%, ${((payload.y || 0) * 100).toFixed(1)}%`;
-    wJson.innerText = JSON.stringify({
-        roomId: payload.roomId,
-        clickId: payload.clickId,
-        label: payload.label,
-        x: payload.x,
-        y: payload.y,
-        aiGuess: payload.aiGuess
-    }, null, 2);
-}
-
-function resetWelcomeUI() {
-    const wLabel = document.getElementById('welcome-ui-label');
-    const wMeta = document.getElementById('welcome-ui-meta');
-    const wJson = document.getElementById('welcome-ui-json');
-    const wWindow = document.getElementById('welcome-ui-window');
-    if (!wLabel || !wMeta || !wJson || !wWindow) return;
-    wWindow.style.display = 'none';
-    wLabel.innerText = 'Welcome John';
-    wMeta.innerText = 'Synthetic message';
-    wJson.innerText = `{
-  "roomId": "",
-  "clickId": "",
-  "label": "",
-  "x": 0,
-  "y": 0,
-  "aiGuess": ""
-}`;
 }
 
 function refreshMockAndroidUIWithGuess(clickId, aiGuess) {
@@ -324,7 +287,7 @@ socket.on("ai_key_guess_broadcast", (data) => {
         const click = pendingClicks.get(normalizedClickId);
         pendingClicks.delete(normalizedClickId);
         if (click && click._timeout) clearTimeout(click._timeout);
-        displayCoordinates(click.x, click.y, click.label || 'Device Tap', normalizedClickId, data.guessed_key, { originalX: data.originalX, originalY: data.originalY, originalLabel: data.originalLabel });
+        displayCoordinates(click.x, click.y, click.label || 'Device Tap', normalizedClickId, data.guessed_key);
     } else if (normalizedClickId) {
         pendingAIGuesses.set(normalizedClickId, data.guessed_key);
         setTimeout(() => pendingAIGuesses.delete(normalizedClickId), 5000);
@@ -336,31 +299,6 @@ socket.on("ai_key_guess_broadcast", (data) => {
     if (aiSuggestion && aiSuggestionText) {
         aiSuggestionText.innerText = data.guessed_key;
         aiSuggestion.style.display = 'block';
-    }
-
-    // Developer helper: duplicate an AI guess as a synthetic welcome message
-    // Only show once per room by default to avoid masking real coordinates.
-    try {
-        if (syntheticWelcomeEnabled) {
-            const roomId = data.roomId || (document.getElementById('roomId')?.value || 'unknown');
-            if (!syntheticWelcomeShown.has(roomId)) {
-                syntheticWelcomeShown.add(roomId);
-                const welcomePayload = {
-                    roomId: roomId,
-                    clickId: `welcome-${Date.now()}`,
-                    label: 'WELCOME',
-                    x: 0.5,
-                    y: 0.05,
-                    aiGuess: 'Welcome John'
-                };
-                // Log it in the raw payload panel for traceability
-                logRawPayload('synthetic_welcome', welcomePayload);
-                // Show it in the dedicated Welcome UI so real mock UI is not overwritten
-                updateWelcomeUI(welcomePayload);
-            }
-        }
-    } catch (e) {
-        console.warn('[SYNTHETIC] failed to create welcome payload', e);
     }
 });
 
@@ -376,13 +314,29 @@ socket.on('device_click_broadcast', (data) => {
                 if (pendingClicks.has(cid)) {
                     const c = pendingClicks.get(cid);
                     pendingClicks.delete(cid);
-                    displayCoordinates(c.x, c.y, c.label || 'Screen Area', cid, null);
+                    displayCoordinates(c.x, c.y, c.label || 'Screen Area', cid, null, {
+                        originalX: c.originalX,
+                        originalY: c.originalY,
+                        originalLabel: c.originalLabel
+                    });
                 }
             }, 800);
 
-            pendingClicks.set(cid, { x: data.x, y: data.y, label: data.label || 'Device Tap', _timeout: t });
+            pendingClicks.set(cid, {
+                x: data.x,
+                y: data.y,
+                label: data.label || 'Device Tap',
+                originalX: data.originalX,
+                originalY: data.originalY,
+                originalLabel: data.originalLabel,
+                _timeout: t
+            });
         } else {
-                displayCoordinates(data.x, data.y, data.label || 'Device Tap', cid, aiGuess || null, { originalX: data.originalX, originalY: data.originalY, originalLabel: data.originalLabel });
+            displayCoordinates(data.x, data.y, data.label || 'Device Tap', cid, aiGuess || null, {
+                originalX: data.originalX,
+                originalY: data.originalY,
+                originalLabel: data.originalLabel
+            });
         }
     }
 });
@@ -391,30 +345,6 @@ function getOrdinal(n) {
     const s = ["th", "st", "nd", "rd"], v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
-
-function updateWelcomeToggleUI() {
-    const btn = document.getElementById('toggle-welcome-btn');
-    if (!btn) return;
-    btn.classList.toggle('active', syntheticWelcomeEnabled);
-    btn.innerHTML = `<i class="fas fa-user-circle"></i> Welcome: ${syntheticWelcomeEnabled ? 'On' : 'Off'}`;
-}
-
-function toggleSyntheticWelcome() {
-    syntheticWelcomeEnabled = !syntheticWelcomeEnabled;
-    localStorage.setItem('syntheticWelcomeEnabled', syntheticWelcomeEnabled ? 'true' : 'false');
-    // Allow re-showing after toggle on by clearing shown tracker
-    if (syntheticWelcomeEnabled) {
-        syntheticWelcomeShown.clear();
-    } else {
-        // Hide Welcome UI immediately when disabled
-        resetWelcomeUI();
-    }
-    updateWelcomeToggleUI();
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    updateWelcomeToggleUI();
-});
 
 function startSharing() {
     const roomId = roomIdInput.value;
