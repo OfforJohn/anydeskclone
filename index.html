@@ -124,12 +124,15 @@
             justify-content: center;
             padding: 20px 40px;
             box-sizing: border-box;
+            gap: 20px;
+            flex-wrap: nowrap;
         }
 
         .remote-container {
+            flex: 1;
             width: 100%;
             height: 100%;
-            max-width: 1000px;
+            max-width: 600px;
             max-height: 78vh;
             display: flex;
             align-items: center;
@@ -150,7 +153,7 @@
             display: none;
         }
 
-        #draw-overlay {
+        #draw-overlay, #draw-overlay-2 {
             position: absolute;
             inset: 0;
             pointer-events: none;
@@ -167,7 +170,7 @@
             border-radius: 20px;
             font-size: 0.8rem;
             display: flex;
-            flex-direction: column; /* Changed to column to stack status and coords */
+            flex-direction: column;
             align-items: flex-end;
             gap: 4px;
             border: 1px solid rgba(255,255,255,0.1);
@@ -186,7 +189,7 @@
             background: rgba(0,0,0,0.3);
             padding: 2px 6px;
             border-radius: 4px;
-            display: none; /* Hidden by default */
+            display: none;
         }
 
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
@@ -197,7 +200,7 @@
             bottom: 30px;
             right: 30px;
             display: flex;
-            flex-direction: column; /* Changed to column to stack panel and log */
+            flex-direction: column;
             align-items: flex-end;
             gap: 15px;
             z-index: 10000;
@@ -205,7 +208,7 @@
 
         .panel-actions {
             display: flex;
-            flex-direction: row; /* Horizontal layout for buttons */
+            flex-direction: row;
             gap: 10px;
             background: rgba(0, 0, 0, 0.7);
             padding: 10px;
@@ -223,7 +226,7 @@
         }
 
         .panel-actions.expanded {
-            max-width: 800px; /* Large enough to hold all buttons */
+            max-width: 1000px;
             opacity: 1;
             padding: 10px;
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -257,16 +260,6 @@
             background: #444;
         }
 
-        .action-btn.restricted {
-            border-color: #ffaa00;
-            color: #ffaa00;
-        }
-
-        .action-btn.restricted:hover {
-            background: rgba(255, 170, 0, 0.2);
-            color: #ffaa00;
-        }
-
         .click-log-window {
             width: 250px;
             max-height: 200px;
@@ -274,7 +267,7 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
-            display: none; /* Shown only when connected */
+            display: none;
             flex-direction: column;
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -459,7 +452,7 @@
         }
         .btn-refresh:hover { background: rgba(255, 255, 255, 0.2); }
 
-        #dino-loader {
+        #dino-loader, #dino-loader-2 {
             position: absolute;
             width: 100%;
             height: 100%;
@@ -470,29 +463,27 @@
             background: #000;
             z-index: 5;
         }
-        .dino-track {
-            position: relative;
-            width: 300px;
-            height: 100px;
-            overflow: hidden;
-            border-bottom: 2px solid #333;
-            margin-bottom: 20px;
-        }
-        .scrolling-dino {
+
+        .click-indicator,
+        .remote-tap-indicator {
             position: absolute;
-            font-size: 40px;
-            bottom: 5px;
-            animation: dino-scroll linear infinite;
-        }
-        .dino-1 { animation-duration: 3s; left: -50px; }
-        .dino-2 { animation-duration: 5s; left: -100px; animation-delay: 1s; }
-        .dino-3 { animation-duration: 4s; left: -150px; animation-delay: 0.5s; }
-        @keyframes dino-scroll {
-            from { transform: translateX(0); left: -50px; }
-            to { transform: translateX(400px); left: -50px; }
+            width: 44px;
+            height: 44px;
+            border: 3px solid #00ff88;
+            background: rgba(0, 255, 136, 0.12);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(0);
+            animation: ripple 0.5s ease-out forwards;
+            z-index: 9999;
+            box-shadow: 0 0 18px rgba(0, 255, 136, 0.35);
         }
 
-        /* Simulator Overlays - Higher Visibility & Movable/Resizable */
+        @keyframes ripple {
+            0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+
         .simulator-overlay {
             position: absolute;
             display: none;
@@ -602,46 +593,6 @@
             align-self: center;
             box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
         }
-
-        /* Click Indicator Animation */
-        .click-indicator,
-        .remote-tap-indicator {
-            position: absolute;
-            width: 44px;
-            height: 44px;
-            border: 3px solid #00ff88;
-            background: rgba(0, 255, 136, 0.12);
-            border-radius: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%) scale(0);
-            animation: ripple 0.5s ease-out forwards;
-            z-index: 9999;
-            box-shadow: 0 0 18px rgba(0, 255, 136, 0.35);
-        }
-
-        @keyframes ripple {
-            0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-        }
-
-        /* Hotspot for simulated Navigation Home clicks */
-        .hotspot {
-            position: absolute;
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.06);
-            z-index: 10002;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: auto;
-            cursor: pointer;
-        }
-
-        .hotspot:active { transform: translate(-50%, -50%) scale(0.95); }
     </style>
 </head>
 <body>
@@ -670,55 +621,36 @@
     </div>
 
     <main>
+        <!-- SCREEN 1 -->
         <div class="remote-container" id="remote-container">
             <div id="dino-loader" style="display: none;">
-                <div class="dino-track">
-                    <div class="scrolling-dino dino-1">🦖</div>
-                    <div class="scrolling-dino dino-2">🦕</div>
-                    <div class="scrolling-dino dino-3">🦖</div>
-                </div>
-                <div class="waiting-text" style="color: #888;">Waiting for device screen...</div>
+                <div style="color: #888;">Waiting for Screen 1...</div>
             </div>
             <video id="remoteVideo" autoplay playsinline></video>
             <canvas id="draw-overlay"></canvas>
 
-            <!-- Hotspot for Navigation Home (simulated) -->
-            <div id="hotspot-nav-home" class="hotspot" title="Navigation Home" style="left:49.9%; top:97.2%; display:block; opacity:0.001;"></div>
-
             <!-- Movable PIN Simulator -->
-            <div id="pin-simulator" class="simulator-overlay" style="width: 220px; height: 320px; top: 10%; left: 10%;">
-                <div class="modal-header">
-                    <span><i class="fas fa-th"></i> PIN GUIDE</span>
-                    <i class="fas fa-compress-arrows-alt"></i>
-                </div>
-                <div class="simulator-content">
-                    <div class="pin-grid">
-                        <div class="pin-btn">1</div><div class="pin-btn">2</div><div class="pin-btn">3</div>
-                        <div class="pin-btn">4</div><div class="pin-btn">5</div><div class="pin-btn">6</div>
-                        <div class="pin-btn">7</div><div class="pin-btn">8</div><div class="pin-btn">9</div>
-                        <div class="pin-btn" style="opacity: 0.3;"><i class="fas fa-backspace"></i></div>
-                        <div class="pin-btn">0</div>
-                        <div class="pin-btn" style="opacity: 0.3;">OK</div>
-                    </div>
-                </div>
+            <div id="pin-simulator" class="simulator-overlay" style="width: 200px; height: 280px; top: 10%; left: 10%;">
+                <div class="modal-header"><span><i class="fas fa-th"></i> PIN</span><i class="fas fa-compress"></i></div>
+                <div class="simulator-content"><div class="pin-grid"><div class="pin-btn">1</div><div class="pin-btn">2</div><div class="pin-btn">3</div><div class="pin-btn">4</div><div class="pin-btn">5</div><div class="pin-btn">6</div><div class="pin-btn">7</div><div class="pin-btn">8</div><div class="pin-btn">9</div><div class="pin-btn" style="opacity:0.3;">*</div><div class="pin-btn">0</div><div class="pin-btn" style="opacity:0.3;">#</div></div></div>
                 <div class="resize-handle"></div>
             </div>
 
             <!-- Movable Pattern Simulator -->
-            <div id="pattern-simulator" class="simulator-overlay" style="width: 250px; height: 250px; top: 10%; right: 10%;">
-                <div class="modal-header">
-                    <span><i class="fas fa-braille"></i> PATTERN GUIDE</span>
-                    <i class="fas fa-compress-arrows-alt"></i>
-                </div>
-                <div class="simulator-content">
-                    <div class="pattern-grid">
-                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
-                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
-                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
-                    </div>
-                </div>
+            <div id="pattern-simulator" class="simulator-overlay" style="width: 220px; height: 220px; top: 10%; right: 10%;">
+                <div class="modal-header"><span><i class="fas fa-braille"></i> PATTERN</span><i class="fas fa-compress"></i></div>
+                <div class="simulator-content"><div class="pattern-grid"><div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div></div></div>
                 <div class="resize-handle"></div>
             </div>
+        </div>
+
+        <!-- SCREEN 2 -->
+        <div class="remote-container" id="remote-container-2">
+            <div id="dino-loader-2" style="display: none;">
+                <div style="color: #888;">Waiting for Screen 2...</div>
+            </div>
+            <video id="remoteVideo2" autoplay playsinline muted></video>
+            <canvas id="draw-overlay-2"></canvas>
         </div>
 
         <div class="status-badge" style="z-index: 10000;">
@@ -733,80 +665,38 @@
         </div>
 
         <div class="control-panel" id="remote-controls" style="display: none;">
-            <!-- Click Log Window -->
             <div class="click-log-window" id="click-log-window" style="display: flex;">
-                <div class="log-header">
-                    <span><i class="fas fa-list-ul"></i> CLICK TRACKER</span>
-                    <span class="btn-clear-log" onclick="clearClickLog()">Clear</span>
-                </div>
-                <div class="log-content" id="click-log-content">
-                    <div style="color: #666; font-style: italic; text-align: center; padding: 10px;">Waiting for taps...</div>
-                </div>
+                <div class="log-header"><span><i class="fas fa-list-ul"></i> TRACKER</span><span class="btn-clear-log" onclick="clearClickLog()">Clear</span></div>
+                <div class="log-content" id="click-log-content"><div style="color:#666; font-style:italic; text-align:center; padding:10px;">Waiting...</div></div>
             </div>
 
             <div class="mock-ui-window" id="mock-ui-window">
-                <div class="log-header">
-                    <span><i class="fas fa-mobile-alt"></i> MOCK UI</span>
-                    <span class="btn-clear-log" onclick="resetMockAndroidUI()">Reset</span>
-                </div>
+                <div class="log-header"><span><i class="fas fa-mobile-alt"></i> MOCK UI</span><span class="btn-clear-log" onclick="resetMockAndroidUI()">Reset</span></div>
                 <div class="mock-ui-content">
-                    <div class="mock-phone">
-                        <div class="mock-phone-header"></div>
-                        <div class="mock-phone-screen">
-                            <div class="screen-label" id="mock-ui-label">Awaiting tap...</div>
-                            <div class="screen-meta" id="mock-ui-meta">Real device tap will appear here.</div>
-                        </div>
-                    </div>
-                    <div class="mock-ui-json" id="mock-ui-json">{
-  "roomId": "",
-  "clickId": "",
-  "label": "",
-  "x": 0,
-  "y": 0,
-  "aiGuess": ""
-}</div>
+                    <div class="mock-phone"><div class="mock-phone-header"></div><div class="mock-phone-screen"><div class="screen-label" id="mock-ui-label">Awaiting...</div><div class="screen-meta" id="mock-ui-meta">Tap will appear here.</div></div></div>
+                    <div class="mock-ui-json" id="mock-ui-json">{}</div>
                 </div>
             </div>
 
             <div class="debug-panel" id="debug-panel">
-                <div class="log-header">
-                    <span><i class="fas fa-bug"></i> RAW PAYLOADS</span>
-                    <span class="btn-clear-log" onclick="document.getElementById('debug-payload-log').innerHTML = ''">Clear</span>
-                </div>
-                <div class="log-content" id="debug-payload-log">
-                    <div style="color: #666; font-style: italic; text-align: center; padding: 10px;">No payloads yet.</div>
-                </div>
+                <div class="log-header"><span><i class="fas fa-bug"></i> PAYLOADS</span><span class="btn-clear-log" onclick="document.getElementById('debug-payload-log').innerHTML = ''">Clear</span></div>
+                <div class="log-content" id="debug-payload-log"><div style="color:#666; font-style:italic; text-align:center; padding:10px;">No data.</div></div>
             </div>
 
-            <!-- Main Actions (Now Collapsible) -->
             <div class="control-panel-wrapper">
                 <div class="panel-actions" id="main-actions-panel">
-                    <button class="action-btn" id="wake-btn" onclick="wakeDevice()">
-                        <i class="fas fa-sun"></i> Wake
-                    </button>
-                    <button class="action-btn restricted" id="security-mode" onclick="toggleSecurityOverride()" title="Enable when screen is black">
-                        <i class="fas fa-shield-alt"></i> Security Override
-                    </button>
+                    <button class="action-btn" id="wake-btn" onclick="wakeDevice()"><i class="fas fa-sun"></i> Wake</button>
+                    <button class="action-btn restricted" id="security-mode" onclick="toggleSecurityOverride()"><i class="fas fa-shield-alt"></i> Override</button>
                     <input type="password" id="unlock-pin" class="unlock-input" placeholder="PIN" maxlength="6">
-                    <button class="action-btn" id="unlock-toggle" onclick="toggleUnlockInput()">
-                        <i class="fas fa-keyboard"></i> PIN
-                    </button>
-                    <button class="action-btn" id="pattern-toggle" onclick="togglePatternMode()">
-                        <i class="fas fa-braille"></i> Pattern Mode
-                    </button>
+                    <button class="action-btn" id="unlock-toggle" onclick="toggleUnlockInput()"><i class="fas fa-keyboard"></i> PIN</button>
+                    <button class="action-btn" id="pattern-toggle" onclick="togglePatternMode()"><i class="fas fa-braille"></i> Pattern</button>
                     <div style="display: flex; gap: 8px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
-                        <input type="text" id="remote-type-input" placeholder="Chat here..." style="width: 140px; margin: 0; padding: 8px; font-size: 0.85rem; background: transparent; border: none; color: white; outline: none;">
-                        <button class="action-btn" onclick="sendTypeText()" style="padding: 8px 12px; background: #00ff88; color: black; border: none;">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
+                        <input type="text" id="remote-type-input" placeholder="Type here..." style="width: 100px; margin: 0; padding: 8px; font-size: 0.8rem; background: transparent; border: none; color: white; outline: none;">
+                        <button class="action-btn" onclick="sendTypeText()" style="padding: 8px 12px; background: #00ff88; color: black; border: none;"><i class="fas fa-paper-plane"></i></button>
                     </div>
-                    <button class="action-btn" id="send-unlock" style="display: none;" onclick="sendUnlock()">
-                        Confirm
-                    </button>
+                    <button class="action-btn" id="send-unlock" style="display: none;" onclick="sendUnlock()">OK</button>
                 </div>
-                <button class="toggle-panel-btn" id="panel-toggle" onclick="toggleMainPanel()">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
+                <button class="toggle-panel-btn" id="panel-toggle" onclick="toggleMainPanel()"><i class="fas fa-chevron-left"></i></button>
             </div>
         </div>
     </main>
