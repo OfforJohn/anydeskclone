@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 
 const app = express();
@@ -13,6 +14,145 @@ const io = new Server(server, {
   },
   allowEIO3: true,
   transports: ['websocket', 'polling']
+});
+
+// Explicit route for script.js to avoid MIME and 404 issues.
+app.get('/script.js', (req, res) => {
+  const scriptPath = path.join(__dirname, 'script.js');
+  console.log('[STATIC] /script.js requested, sending:', scriptPath);
+  res.type('application/javascript');
+  res.sendFile(scriptPath, (err) => {
+    if (err) {
+      console.error('[STATIC] Failed to send script.js', err);
+      res.status(err.status || 500).send('script.js not found');
+    }
+  });
+});
+
+// Optional fallback for any JS file in the root directory.
+// Use a parameterized route to avoid path-to-regexp errors with patterns like "/*.js".
+// Fallback for JS files using a simple parameter route and validation.
+app.get('/:file', (req, res) => {
+  const requested = req.params.file || '';
+  // Only allow requests for .js files here
+  if (!requested.endsWith('.js')) {
+    return res.status(404).send('Not found');
+  }
+  const filePath = path.join(__dirname, requested);
+  console.log('[STATIC] JS fallback requested:', requested, '->', filePath);
+  res.type('application/javascript');
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error('[STATIC] Failed to send', filePath, err);
+      res.status(err.status || 500).send(requested + ' not found');
+    }
+  });
+});
+
+app.use(express.static(__dirname));
+// Parse JSON bodies for the admin API
+app.use(express.json());
+
+// Per-room zone mappings used to override raw Android labels
+const zoneMaps = {};
+
+let DEFAULT_ZONES = [];
+try {
+  const raw = fs.readFileSync(path.join(__dirname, 'zones.json'), 'utf8');
+  DEFAULT_ZONES = JSON.parse(raw);
+  console.log('[ZONES] Loaded DEFAULT_ZONES from zones.json');
+} catch (e) {
+  DEFAULT_ZONES = [
+    { name: 'NAV BAR', x: 0.50, y: 0.97, radius: 0.15 },
+    { name: 'TOP BAR', x: 0.50, y: 0.10, radius: 0.18 },
+    { name: 'CENTER', x: 0.50, y: 0.50, radius: 0.20 },
+    { name: 'LOWER', x: 0.50, y: 0.80, radius: 0.20 },
+    { name: 'KEY 2', x: 0.50, y: 0.44, radius: 0.12 },
+    { name: 'KEY P2', x: 0.50, y: 0.35, radius: 0.12 },
+    { name: 'KEY DEL', x: 0.25, y: 0.80, radius: 0.12 },
+    { name: 'KEY ENTER', x: 0.90, y: 0.85, radius: 0.12 }
+  ];
+  console.warn('[ZONES] Using built-in DEFAULT_ZONES');
+}
+
+function distance(x1, y1, x2, y2) {
+  return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+}
+
+// Return mapped zone object {name,x,y} if close enough, otherwise null
+function mapClickToLabel(roomId, x, y, rawLabel) {
+  const zones = zoneMaps[roomId] || DEFAULT_ZONES;
+  let best = { zone: null, dist: Infinity };
+  for (const z of zones) {
+    const d = distance(x, y, z.x, z.y);
+    if (d < best.dist) best = { zone: z, dist: d };
+  }
+  const radius = best.zone ? (best.zone.radius || 0.16) : 0.16;
+  const normalizedLabel = rawLabel ? String(rawLabel).toLowerCase() : '';
+  const isGeneric = normalizedLabel.includes('screen') || normalizedLabel.includes('tap') || normalizedLabel.includes('touch') || normalizedLabel.includes('click') || normalizedLabel.includes('device');
+  const fallbackRadius = Math.max(radius * 1.75, 0.25);
+
+  console.log(`[MAP] room=${roomId} rawLabel=${normalizedLabel || 'N/A'} x=${x} y=${y} nearest=${best.zone ? best.zone.name : 'none'} dist=${best.dist.toFixed(3)} radius=${radius} fallback=${fallbackRadius.toFixed(3)} generic=${isGeneric}`);
+
+  if (best.zone && best.dist <= radius) {
+    return { name: best.zone.name, x: best.zone.x, y: best.zone.y };
+  }
+
+  if (best.zone && isGeneric && best.dist <= fallbackRadius) {
+    console.log(`[MAP-FALLBACK] mapped generic rawLabel '${rawLabel}' to nearest zone '${best.zone.name}'`);
+    return { name: best.zone.name, x: best.zone.x, y: best.zone.y };
+  }
+
+  return null;
+}
+
+// Short-lived dedupe set for clickIds to avoid processing same click twice
+const processedClickIds = new Set();
+
+function processDeviceClick(clickPayload) {
+  const cid = clickPayload.clickId ? String(clickPayload.clickId) : null;
+  if (cid && processedClickIds.has(cid)) {
+    console.log(`[DEDUP] Ignoring duplicate clickId ${cid}`);
+    return;
+  }
+  if (cid) {
+    processedClickIds.add(cid);
+    setTimeout(() => processedClickIds.delete(cid), 3000);
+  }
+
+  const roomId = clickPayload.roomId || 'global';
+  const mapped = mapClickToLabel(roomId, clickPayload.x, clickPayload.y, clickPayload.label);
+  clickPayload.originalLabel = clickPayload.label || null;
+  clickPayload.originalCoords = { x: clickPayload.x, y: clickPayload.y };
+
+  const uiPayload = {
+    roomId: roomId,
+    clickId: clickPayload.clickId,
+    source: clickPayload.source,
+    label: mapped ? mapped.name : 'Screen Area',
+    x: mapped ? mapped.x : 0.5,
+    y: mapped ? mapped.y : 0.5,
+    mapped: !!mapped
+  };
+
+  console.log(`[CLICK] room=${roomId} clickId=${cid} mapped=${uiPayload.mapped} label=${uiPayload.label}`);
+
+  // Emit sanitized UI payload to room, raw to AI listeners
+  io.to(roomId).emit('device_click_broadcast', uiPayload);
+  io.to('ai-room').emit('device_click_broadcast', clickPayload);
+  return uiPayload;
+}
+
+// Admin HTTP API: set zones for a room
+app.post('/rooms/:roomId/zones', (req, res) => {
+  const roomId = req.params.roomId;
+  const zones = req.body.zones;
+  if (!Array.isArray(zones)) return res.status(400).json({ error: 'zones must be an array' });
+  zoneMaps[roomId] = zones;
+  console.log(`[ZONES] Updated zones for room ${roomId}`);
+  // Notify connected clients in the room
+  io.to(roomId).emit('zones_updated', zones);
+  return res.json({ ok: true });
 });
 
 // --- AUTOMATIC AI CLIENT SPAWNER (Improved) ---
@@ -72,46 +212,46 @@ io.on("connection", (socket) => {
     socket.on("message", (data) => {
         // If the Android app sends a device_click via the message channel (signaling)
         if (data && data.type === "device_click") {
-            const roomId = data.roomId;
-            const clickPayload = { ...data, source: "Device Tap" };
-            console.log(`[DEBUG] Signaling click to AI for room: ${roomId}`);
-            io.in(roomId).emit("device_click_broadcast", clickPayload);
-            io.in("ai-room").emit("device_click_broadcast", clickPayload);
-            // Acknowledge back to the sender so device or client can confirm receipt
-            try { socket.emit('device_click_ack', clickPayload); } catch(e) { console.warn('[ACK] Failed to ack sender', e); }
+          const roomId = data.roomId;
+          const clickPayload = { ...data, source: "Device Tap" };
+          console.log(`[DEBUG] Signaling click to AI for room: ${roomId}`);
+
+          // Centralized processing and emission (dedupe + mapping)
+          const ui = processDeviceClick(clickPayload);
+          try { socket.emit('device_click_ack', ui); } catch(e) { console.warn('[ACK] Failed to ack sender', e); }
         }
         socket.to(data.roomId).emit("message", data);
     });
 
     // New: Broadcast click events to Python AI Client
     socket.on("device_click", (data) => {
-        const roomId = data.roomId || "global";
-
         const clickPayload = {
             ...data,
-            roomId: roomId,
+            roomId: data.roomId || "global",
             source: data.source || "Physical Touch"
         };
 
-        // 1. Send to laptop browser specifically
-        io.to(roomId).emit("device_click_broadcast", clickPayload);
+        const ui = processDeviceClick(clickPayload);
+        try { socket.emit('device_click_ack', ui); } catch(e) { console.warn('[ACK] Failed to ack sender', e); }
 
-        // 2. ULTIMATE FIX: Broadcast to EVERYONE in ai-room (The AI)
-        io.emit("device_click_broadcast", clickPayload);
-
-        // Acknowledge back to the sender so device/client can rely on the server round-trip
-        try { socket.emit('device_click_ack', clickPayload); } catch(e) { console.warn('[ACK] Failed to ack sender', e); }
-
-        console.log(`[AI-ROUTING] Shout click from ${roomId} to all listeners.`);
+        console.log(`[AI-ROUTING] Shout click from ${clickPayload.roomId} to all listeners.`);
     });
 
     // New: Handle AI responses and broadcast to web UI
     socket.on("ai_key_guess", (data) => {
-        // ULTIMATE FIX: Shout the guess to EVERY connected browser
-        // This bypasses all Room ID mismatch issues
-        io.emit("ai_key_guess_broadcast", data);
+      console.log('[SERVER] ai_key_guess received', data);
+      // Route the AI guess to the specific room if provided to avoid duplicates.
+      if (data && data.roomId) {
+        io.to(data.roomId).emit("ai_key_guess_broadcast", data);
+      } else {
+        // If no room specified, forward to ai-room listeners only
+        io.to("ai-room").emit("ai_key_guess_broadcast", data);
+      }
 
-        console.log(`[AI-ROUTING] Shout guess '${data.guessed_key}' to all browsers.`);
+      // Also mirror to ai-room for any internal AI listeners
+      io.to("ai-room").emit("ai_key_guess_broadcast", data);
+
+      console.log(`[AI-ROUTING] Guess '${data.guessed_key}' routed to room=${data.roomId || 'ai-room'}.`);
     });
 
     socket.on("unlock_event", (data) => {
