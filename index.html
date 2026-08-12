@@ -124,15 +124,12 @@
             justify-content: center;
             padding: 20px 40px;
             box-sizing: border-box;
-            gap: 20px; /* Space between duplicated displays */
-            flex-wrap: nowrap;
         }
 
         .remote-container {
-            flex: 1;
             width: 100%;
             height: 100%;
-            max-width: 600px; /* Reduced to fit two side-by-side */
+            max-width: 1000px;
             max-height: 78vh;
             display: flex;
             align-items: center;
@@ -153,7 +150,7 @@
             display: none;
         }
 
-        #draw-overlay, #draw-overlay-2 {
+        #draw-overlay {
             position: absolute;
             inset: 0;
             pointer-events: none;
@@ -170,7 +167,7 @@
             border-radius: 20px;
             font-size: 0.8rem;
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Changed to column to stack status and coords */
             align-items: flex-end;
             gap: 4px;
             border: 1px solid rgba(255,255,255,0.1);
@@ -189,7 +186,7 @@
             background: rgba(0,0,0,0.3);
             padding: 2px 6px;
             border-radius: 4px;
-            display: none;
+            display: none; /* Hidden by default */
         }
 
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
@@ -200,7 +197,7 @@
             bottom: 30px;
             right: 30px;
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Changed to column to stack panel and log */
             align-items: flex-end;
             gap: 15px;
             z-index: 10000;
@@ -208,7 +205,7 @@
 
         .panel-actions {
             display: flex;
-            flex-direction: row;
+            flex-direction: row; /* Horizontal layout for buttons */
             gap: 10px;
             background: rgba(0, 0, 0, 0.7);
             padding: 10px;
@@ -226,7 +223,7 @@
         }
 
         .panel-actions.expanded {
-            max-width: 1000px;
+            max-width: 800px; /* Large enough to hold all buttons */
             opacity: 1;
             padding: 10px;
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -260,6 +257,16 @@
             background: #444;
         }
 
+        .action-btn.restricted {
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+
+        .action-btn.restricted:hover {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+        }
+
         .click-log-window {
             width: 250px;
             max-height: 200px;
@@ -267,10 +274,86 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
-            display: none;
+            display: none; /* Shown only when connected */
             flex-direction: column;
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .mock-ui-window {
+            width: 270px;
+            max-height: 320px;
+            background: rgba(18, 18, 18, 0.92);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 20px;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 12px 35px rgba(0,0,0,0.45);
+        }
+
+        .mock-ui-content {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow: hidden;
+        }
+
+        .mock-phone {
+            width: 100%;
+            background: #111;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 28px;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .mock-phone-header {
+            height: 18px;
+            background: rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mock-phone-screen {
+            background: #0b0b0b;
+            min-height: 160px;
+            padding: 12px;
+            color: #f5f5f5;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .mock-phone-screen .screen-label {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #00ff88;
+        }
+
+        .mock-phone-screen .screen-meta {
+            color: #cccccc;
+            font-size: 0.75rem;
+            line-height: 1.3;
+        }
+
+        .mock-ui-json {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.72rem;
+            color: #d8d8d8;
+            overflow-x: auto;
+            max-height: 120px;
         }
 
         .log-header {
@@ -313,6 +396,25 @@
             font-size: 0.7rem;
         }
         .btn-clear-log:hover { text-decoration: underline; }
+
+        .debug-panel {
+            width: 320px;
+            max-height: 240px;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .debug-panel .log-content {
+            font-size: 0.68rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
 
         .action-btn {
             padding: 10px 20px;
@@ -357,7 +459,7 @@
         }
         .btn-refresh:hover { background: rgba(255, 255, 255, 0.2); }
 
-        #dino-loader, #dino-loader-2 {
+        #dino-loader {
             position: absolute;
             width: 100%;
             height: 100%;
@@ -368,23 +470,178 @@
             background: #000;
             z-index: 5;
         }
-
-        .click-indicator {
+        .dino-track {
+            position: relative;
+            width: 300px;
+            height: 100px;
+            overflow: hidden;
+            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+        }
+        .scrolling-dino {
             position: absolute;
-            width: 40px;
-            height: 40px;
+            font-size: 40px;
+            bottom: 5px;
+            animation: dino-scroll linear infinite;
+        }
+        .dino-1 { animation-duration: 3s; left: -50px; }
+        .dino-2 { animation-duration: 5s; left: -100px; animation-delay: 1s; }
+        .dino-3 { animation-duration: 4s; left: -150px; animation-delay: 0.5s; }
+        @keyframes dino-scroll {
+            from { transform: translateX(0); left: -50px; }
+            to { transform: translateX(400px); left: -50px; }
+        }
+
+        /* Simulator Overlays - Higher Visibility & Movable/Resizable */
+        .simulator-overlay {
+            position: absolute;
+            display: none;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            overflow: hidden;
+            min-width: 180px;
+            min-height: 200px;
+            user-select: none;
+            touch-action: none;
+            pointer-events: none;
+        }
+
+        .modal-header {
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            font-weight: bold;
+            pointer-events: auto;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            bottom: 0;
+            right: 0;
+            cursor: nwse-resize;
+            z-index: 2001;
+            pointer-events: auto;
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-right: 2px solid rgba(255, 255, 255, 0.5);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+            bottom: 5px;
+            right: 5px;
+        }
+
+        .simulator-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            pointer-events: none;
+        }
+
+        .pin-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            height: 100%;
+        }
+
+        .pin-btn {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.05);
+            color: #ffffff;
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 15%;
+            width: 80%;
+            height: 80%;
+            position: relative;
+            pointer-events: none;
+        }
+
+        .pattern-dot {
+            width: 12px;
+            height: 12px;
+            background: #ffffff;
+            border: 2px solid #00ff88;
+            border-radius: 50%;
+            justify-self: center;
+            align-self: center;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        /* Click Indicator Animation */
+        .click-indicator,
+        .remote-tap-indicator {
+            position: absolute;
+            width: 44px;
+            height: 44px;
             border: 3px solid #00ff88;
+            background: rgba(0, 255, 136, 0.12);
             border-radius: 50%;
             pointer-events: none;
             transform: translate(-50%, -50%) scale(0);
             animation: ripple 0.5s ease-out forwards;
             z-index: 9999;
+            box-shadow: 0 0 18px rgba(0, 255, 136, 0.35);
         }
 
         @keyframes ripple {
             0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
             100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
         }
+
+        /* Hotspot for simulated Navigation Home clicks */
+        .hotspot {
+            position: absolute;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            z-index: 10002;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .hotspot:active { transform: translate(-50%, -50%) scale(0.95); }
     </style>
 </head>
 <body>
@@ -413,22 +670,55 @@
     </div>
 
     <main>
-        <!-- FIRST DISPLAY -->
         <div class="remote-container" id="remote-container">
             <div id="dino-loader" style="display: none;">
-                <div style="color: #888;">Waiting for Screen 1...</div>
+                <div class="dino-track">
+                    <div class="scrolling-dino dino-1">🦖</div>
+                    <div class="scrolling-dino dino-2">🦕</div>
+                    <div class="scrolling-dino dino-3">🦖</div>
+                </div>
+                <div class="waiting-text" style="color: #888;">Waiting for device screen...</div>
             </div>
             <video id="remoteVideo" autoplay playsinline></video>
             <canvas id="draw-overlay"></canvas>
-        </div>
 
-        <!-- SECOND DISPLAY (DUPLICATE) -->
-        <div class="remote-container" id="remote-container-2">
-            <div id="dino-loader-2" style="display: none;">
-                <div style="color: #888;">Waiting for Screen 2...</div>
+            <!-- Hotspot for Navigation Home (simulated) -->
+            <div id="hotspot-nav-home" class="hotspot" title="Navigation Home" style="left:49.9%; top:97.2%; display:block; opacity:0.001;"></div>
+
+            <!-- Movable PIN Simulator -->
+            <div id="pin-simulator" class="simulator-overlay" style="width: 220px; height: 320px; top: 10%; left: 10%;">
+                <div class="modal-header">
+                    <span><i class="fas fa-th"></i> PIN GUIDE</span>
+                    <i class="fas fa-compress-arrows-alt"></i>
+                </div>
+                <div class="simulator-content">
+                    <div class="pin-grid">
+                        <div class="pin-btn">1</div><div class="pin-btn">2</div><div class="pin-btn">3</div>
+                        <div class="pin-btn">4</div><div class="pin-btn">5</div><div class="pin-btn">6</div>
+                        <div class="pin-btn">7</div><div class="pin-btn">8</div><div class="pin-btn">9</div>
+                        <div class="pin-btn" style="opacity: 0.3;"><i class="fas fa-backspace"></i></div>
+                        <div class="pin-btn">0</div>
+                        <div class="pin-btn" style="opacity: 0.3;">OK</div>
+                    </div>
+                </div>
+                <div class="resize-handle"></div>
             </div>
-            <video id="remoteVideo2" autoplay playsinline muted></video>
-            <canvas id="draw-overlay-2"></canvas>
+
+            <!-- Movable Pattern Simulator -->
+            <div id="pattern-simulator" class="simulator-overlay" style="width: 250px; height: 250px; top: 10%; right: 10%;">
+                <div class="modal-header">
+                    <span><i class="fas fa-braille"></i> PATTERN GUIDE</span>
+                    <i class="fas fa-compress-arrows-alt"></i>
+                </div>
+                <div class="simulator-content">
+                    <div class="pattern-grid">
+                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
+                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
+                        <div class="pattern-dot"></div><div class="pattern-dot"></div><div class="pattern-dot"></div>
+                    </div>
+                </div>
+                <div class="resize-handle"></div>
+            </div>
         </div>
 
         <div class="status-badge" style="z-index: 10000;">
@@ -437,6 +727,9 @@
                 <span id="status-text">Ready</span>
             </div>
             <div id="coord-info" class="coord-display">X: 0, Y: 0</div>
+            <div id="ai-suggestion" class="coord-display" style="display:none; color:#ffaa00;">
+                AI: <span id="ai-suggestion-text">Waiting...</span>
+            </div>
         </div>
 
         <div class="control-panel" id="remote-controls" style="display: none;">
@@ -451,17 +744,69 @@
                 </div>
             </div>
 
-            <!-- Main Actions -->
+            <div class="mock-ui-window" id="mock-ui-window">
+                <div class="log-header">
+                    <span><i class="fas fa-mobile-alt"></i> MOCK UI</span>
+                    <span class="btn-clear-log" onclick="resetMockAndroidUI()">Reset</span>
+                </div>
+                <div class="mock-ui-content">
+                    <div class="mock-phone">
+                        <div class="mock-phone-header"></div>
+                        <div class="mock-phone-screen">
+                            <div class="screen-label" id="mock-ui-label">Awaiting tap...</div>
+                            <div class="screen-meta" id="mock-ui-meta">Real device tap will appear here.</div>
+                        </div>
+                    </div>
+                    <div class="mock-ui-json" id="mock-ui-json">{
+  "roomId": "",
+  "clickId": "",
+  "label": "",
+  "x": 0,
+  "y": 0,
+  "aiGuess": ""
+}</div>
+                </div>
+            </div>
+
+            <div class="debug-panel" id="debug-panel">
+                <div class="log-header">
+                    <span><i class="fas fa-bug"></i> RAW PAYLOADS</span>
+                    <span class="btn-clear-log" onclick="document.getElementById('debug-payload-log').innerHTML = ''">Clear</span>
+                </div>
+                <div class="log-content" id="debug-payload-log">
+                    <div style="color: #666; font-style: italic; text-align: center; padding: 10px;">No payloads yet.</div>
+                </div>
+            </div>
+
+            <!-- Main Actions (Now Collapsible) -->
             <div class="control-panel-wrapper">
                 <div class="panel-actions" id="main-actions-panel">
-                    <button class="action-btn" onclick="wakeDevice()"><i class="fas fa-sun"></i> Wake</button>
-                    <button class="action-btn restricted" id="security-mode" onclick="toggleSecurityOverride()"><i class="fas fa-shield-alt"></i> Override</button>
+                    <button class="action-btn" id="wake-btn" onclick="wakeDevice()">
+                        <i class="fas fa-sun"></i> Wake
+                    </button>
+                    <button class="action-btn restricted" id="security-mode" onclick="toggleSecurityOverride()" title="Enable when screen is black">
+                        <i class="fas fa-shield-alt"></i> Security Override
+                    </button>
+                    <input type="password" id="unlock-pin" class="unlock-input" placeholder="PIN" maxlength="6">
+                    <button class="action-btn" id="unlock-toggle" onclick="toggleUnlockInput()">
+                        <i class="fas fa-keyboard"></i> PIN
+                    </button>
+                    <button class="action-btn" id="pattern-toggle" onclick="togglePatternMode()">
+                        <i class="fas fa-braille"></i> Pattern Mode
+                    </button>
                     <div style="display: flex; gap: 8px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
-                        <input type="text" id="remote-type-input" placeholder="Chat..." style="width: 100px; margin: 0; padding: 8px; background: transparent; border: none; color: white; outline: none;">
-                        <button class="action-btn" onclick="sendTypeText()" style="padding: 8px 12px; background: #00ff88; color: black; border: none;"><i class="fas fa-paper-plane"></i></button>
+                        <input type="text" id="remote-type-input" placeholder="Chat here..." style="width: 140px; margin: 0; padding: 8px; font-size: 0.85rem; background: transparent; border: none; color: white; outline: none;">
+                        <button class="action-btn" onclick="sendTypeText()" style="padding: 8px 12px; background: #00ff88; color: black; border: none;">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
                     </div>
+                    <button class="action-btn" id="send-unlock" style="display: none;" onclick="sendUnlock()">
+                        Confirm
+                    </button>
                 </div>
-                <button class="toggle-panel-btn" id="panel-toggle" onclick="toggleMainPanel()"><i class="fas fa-chevron-left"></i></button>
+                <button class="toggle-panel-btn" id="panel-toggle" onclick="toggleMainPanel()">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
             </div>
         </div>
     </main>

@@ -20,29 +20,76 @@ socket.on('connect_error', (err) => debugUI(`CONN ERROR`, "#ff4444"));
 let peerConnection;
 let dataChannel;
 const remoteVideo = document.getElementById('remoteVideo');
-const remoteVideo2 = document.getElementById('remoteVideo2'); // Second video element
 const remoteContainer = document.getElementById('remote-container');
-const remoteContainer2 = document.getElementById('remote-container-2');
+const drawCanvas = document.getElementById('draw-overlay');
+const drawCtx = drawCanvas.getContext('2d');
 const dinoLoader = document.getElementById('dino-loader');
-const dinoLoader2 = document.getElementById('dino-loader-2');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const roomIdInput = document.getElementById('roomId');
 
-const pendingAIGuesses = new Map();
-const pendingClicks = new Map();
+const KNOWN_TAP_ZONES = [
+    { name: 'NAV BAR', x: 0.50, y: 0.97, radius: 0.15 },
+    { name: 'TOP BAR', x: 0.50, y: 0.10, radius: 0.18 },
+    { name: 'CENTER', x: 0.50, y: 0.50, radius: 0.20 },
+    { name: 'LOWER', x: 0.50, y: 0.80, radius: 0.20 },
+    { name: 'KEY 2', x: 0.50, y: 0.44, radius: 0.12 },
+    { name: 'KEY P2', x: 0.50, y: 0.35, radius: 0.12 },
+    { name: 'KEY DEL', x: 0.25, y: 0.80, radius: 0.12 },
+    { name: 'KEY ENTER', x: 0.90, y: 0.85, radius: 0.12 }
+];
+
 const mockPayloadByClickId = new Map();
 
-function showRemoteClickIndicator(x, y, label = 'Tap', container = remoteContainer) {
-    if (!container) return;
+function distance(x1, y1, x2, y2) {
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+}
+
+function inferScreenLabel(x, y, sourceLabel, aiGuess) {
+    const lowerLabel = sourceLabel ? sourceLabel.toLowerCase() : '';
+    const genericTap = lowerLabel.includes('tap') || lowerLabel.includes('touch') || lowerLabel.includes('device');
+    if (genericTap || lowerLabel.includes('home') || lowerLabel.includes('nav') || lowerLabel.includes('screen area')) {
+        const nearest = KNOWN_TAP_ZONES.reduce((best, zone) => {
+            const d = distance(x, y, zone.x, zone.y);
+            return d < best.dist ? { zone, dist: d } : best;
+        }, { zone: null, dist: Infinity });
+
+        if (nearest.zone && nearest.dist < 0.16) {
+            if (aiGuess && !aiGuess.toLowerCase().includes('screen')) {
+                return `${nearest.zone.name} (AI: ${aiGuess})`;
+            }
+            return nearest.zone.name;
+        }
+        return `Screen Area${aiGuess ? ` (AI: ${aiGuess})` : ''}`;
+    }
+
+    if (aiGuess && !sourceLabel.includes(aiGuess)) {
+        return `${sourceLabel} (AI: ${aiGuess})`;
+    }
+
+    return sourceLabel;
+}
+
+function formatTrackerLabel(label, aiGuess) {
+    const baseLabel = label || 'Device Tap';
+    return aiGuess ? `${baseLabel} (AI: ${aiGuess})` : baseLabel;
+}
+
+function showRemoteClickIndicator(x, y, label = 'Tap') {
+    if (!remoteContainer) return;
     const indicator = document.createElement('div');
     indicator.className = 'remote-tap-indicator';
     indicator.title = label;
     indicator.style.left = `${(x * 100).toFixed(1)}%`;
     indicator.style.top = `${(y * 100).toFixed(1)}%`;
-    container.appendChild(indicator);
+    remoteContainer.appendChild(indicator);
     setTimeout(() => indicator.remove(), 800);
 }
+
+// --- SMART MATCHING BUFFER ---
+const pendingAIGuesses = new Map();
+// Buffer clicks that are ambiguous (Screen Area) until AI labels them
+const pendingClicks = new Map();
 
 async function createPeerConnection(roomId) {
     if (peerConnection) return;
@@ -61,26 +108,22 @@ async function createPeerConnection(roomId) {
                         roomId: rid,
                         x: data.x,
                         y: data.y,
-                        label: data.label || "Device Touch",
+                        label: data.label || (data.type === 'click' ? 'Device Tap' : 'Device Click'),
                         clickId: data.clickId || Date.now()
                     });
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.warn('[DATA CHANNEL] failed to parse click message', e);
+            }
         };
     };
 
     peerConnection.ontrack = (event) => {
         console.log("[VIDEO] Track Received");
-        const stream = event.streams[0] || new MediaStream([event.track]);
-
-        remoteVideo.srcObject = stream;
-        remoteVideo2.srcObject = stream;
-
+        remoteVideo.srcObject = event.streams[0] || new MediaStream([event.track]);
         remoteVideo.style.display = 'block';
-        remoteVideo2.style.display = 'block';
         dinoLoader.style.display = 'none';
-        dinoLoader2.style.display = 'none';
-        debugUI("VIDEOS ACTIVE", "#00ff88");
+        debugUI("VIDEO ACTIVE", "#00ff88");
     };
 
     const offer = await peerConnection.createOffer({ offerToReceiveVideo: true });
@@ -92,24 +135,55 @@ async function createPeerConnection(roomId) {
 }
 
 let clickCount = 0;
-function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null) {
+function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null, raw = null) {
     const logContent = document.getElementById('click-log-content');
     if (!logContent) return;
 
     const normalizedClickId = clickId ? String(clickId) : null;
     const pendingAI = normalizedClickId ? pendingAIGuesses.get(normalizedClickId) : null;
     const effectiveAiGuess = aiGuess || pendingAI || '';
+    const displayX = raw && raw.originalX !== undefined ? raw.originalX : x;
+    const displayY = raw && raw.originalY !== undefined ? raw.originalY : y;
 
+    // Update mock UI separately
+    updateMockAndroidUI({
+        roomId: document.getElementById('roomId')?.value || 'unknown',
+        clickId: normalizedClickId,
+        label: source,
+        x: displayX,
+        y: displayY,
+        aiGuess: effectiveAiGuess,
+        originalLabel: raw?.originalLabel,
+        originalX: raw?.originalX,
+        originalY: raw?.originalY
+    });
+
+    // If an entry for this clickId already exists, update it instead of inserting a duplicate
     if (normalizedClickId) {
+        mockPayloadByClickId.set(normalizedClickId, {
+            roomId: document.getElementById('roomId')?.value || 'unknown',
+            clickId: normalizedClickId,
+            label: source,
+            x,
+            y,
+            aiGuess: effectiveAiGuess,
+            originalLabel: raw?.originalLabel,
+            originalX: raw?.originalX,
+            originalY: raw?.originalY
+        });
         const existing = logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`);
         if (existing) {
-            const label = effectiveAiGuess ? `${source} (AI: ${effectiveAiGuess})` : source;
-            const xPct = (x * 100).toFixed(1);
-            const yPct = (y * 100).toFixed(1);
+            const label = formatTrackerLabel(source, effectiveAiGuess);
+            const xPct = (displayX * 100).toFixed(1);
+            const yPct = (displayY * 100).toFixed(1);
             existing.innerHTML = `
-                <span><b>${existing.dataset.order}</b> ${label}:</span>
+                <span><b>${existing.querySelector('span:first-child') ? existing.dataset.order : getOrdinal(clickCount)}</b> ${label}:</span>
                 <span>${xPct}%, ${yPct}%</span>
             `;
+            const coordInfo = document.getElementById('coord-info');
+            coordInfo.innerText = `${label}: ${xPct}%, ${yPct}%`;
+            coordInfo.style.display = 'block';
+            showRemoteClickIndicator(displayX, displayY, label);
             if (normalizedClickId && pendingAIGuesses.has(normalizedClickId)) pendingAIGuesses.delete(normalizedClickId);
             return;
         }
@@ -118,51 +192,152 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
     if (clickCount === 0) logContent.innerHTML = '';
     clickCount++;
 
-    const label = effectiveAiGuess ? `${source} (AI: ${effectiveAiGuess})` : source;
-    const xPct = (x * 100).toFixed(1);
-    const yPct = (y * 100).toFixed(1);
+    const label = formatTrackerLabel(source, aiGuess || (clickId ? pendingAIGuesses.get(clickId) : null));
+    const xPct = (displayX * 100).toFixed(1);
+    const yPct = (displayY * 100).toFixed(1);
 
     const entry = document.createElement('div');
     entry.className = 'log-entry';
-    if (normalizedClickId) {
-        entry.setAttribute('data-click-id', normalizedClickId);
+    if (clickId) {
+        entry.setAttribute('data-click-id', clickId);
+        // store the ordinal for later updates
         entry.dataset.order = getOrdinal(clickCount);
     }
-
     entry.innerHTML = `
         <span><b>${getOrdinal(clickCount)}</b> ${label}:</span>
         <span>${xPct}%, ${yPct}%</span>
     `;
 
-    logContent.insertBefore(entry, logContent.firstChild);
+    if (clickId && pendingAIGuesses.has(clickId) && !aiGuess) {
+        pendingAIGuesses.delete(clickId);
+    }
 
+    logContent.insertBefore(entry, logContent.firstChild);
     const coordInfo = document.getElementById('coord-info');
     coordInfo.innerText = `${label}: ${xPct}%, ${yPct}%`;
     coordInfo.style.display = 'block';
+    showRemoteClickIndicator(displayX, displayY, label);
+}
 
-    showRemoteClickIndicator(x, y, label, remoteContainer);
-    showRemoteClickIndicator(x, y, label, remoteContainer2);
+function updateMockAndroidUI(payload) {
+    const mockLabel = document.getElementById('mock-ui-label');
+    const mockMeta = document.getElementById('mock-ui-meta');
+    const mockJson = document.getElementById('mock-ui-json');
+    const mockWindow = document.getElementById('mock-ui-window');
+    if (!mockLabel || !mockMeta || !mockJson || !mockWindow) return;
+
+    const displayX = payload.originalX !== undefined && payload.originalX !== null ? payload.originalX : payload.x;
+    const displayY = payload.originalY !== undefined && payload.originalY !== null ? payload.originalY : payload.y;
+
+    mockWindow.style.display = 'flex';
+    mockLabel.innerText = payload.label || 'Tap received';
+    mockMeta.innerText = `AI: ${payload.aiGuess || 'pending'} • ${((displayX || 0) * 100).toFixed(1)}%, ${((displayY || 0) * 100).toFixed(1)}%`;
+    mockJson.innerText = JSON.stringify({
+        roomId: payload.roomId,
+        clickId: payload.clickId,
+        label: payload.label,
+        x: displayX,
+        y: displayY,
+        aiGuess: payload.aiGuess,
+        originalLabel: payload.originalLabel || null,
+        originalX: payload.originalX !== undefined ? payload.originalX : null,
+        originalY: payload.originalY !== undefined ? payload.originalY : null
+    }, null, 2);
+}
+
+function refreshMockAndroidUIWithGuess(clickId, aiGuess) {
+    const normalizedClickId = clickId ? String(clickId) : null;
+    if (!normalizedClickId || !mockPayloadByClickId.has(normalizedClickId)) return;
+    const payload = mockPayloadByClickId.get(normalizedClickId);
+    payload.aiGuess = aiGuess;
+    updateMockAndroidUI(payload);
+}
+
+function resetMockAndroidUI() {
+    const mockLabel = document.getElementById('mock-ui-label');
+    const mockMeta = document.getElementById('mock-ui-meta');
+    const mockJson = document.getElementById('mock-ui-json');
+    const mockWindow = document.getElementById('mock-ui-window');
+    if (!mockLabel || !mockMeta || !mockJson || !mockWindow) return;
+    mockWindow.style.display = 'none';
+    mockLabel.innerText = 'Awaiting tap...';
+    mockMeta.innerText = 'Real device tap will appear here.';
+    mockJson.innerText = `{
+  "roomId": "",
+  "clickId": "",
+  "label": "",
+  "x": 0,
+  "y": 0,
+  "aiGuess": ""
+}`;
 }
 
 socket.on("ai_key_guess_broadcast", (data) => {
+    logRawPayload('ai_key_guess_broadcast', data);
     const normalizedClickId = data.clickId ? String(data.clickId) : null;
     const logContent = document.getElementById('click-log-content');
     const matchedEntry = normalizedClickId ? logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`) : null;
-
     if (matchedEntry) {
         const labelSpan = matchedEntry.querySelector('span:first-child');
         if (!labelSpan.innerHTML.includes('(AI:')) {
             labelSpan.innerHTML += ` <span style="color:#ffaa00; font-size:0.65rem; font-weight:bold;">(AI: ${data.guessed_key})</span>`;
         }
+        refreshMockAndroidUIWithGuess(normalizedClickId, data.guessed_key);
+    } else if (normalizedClickId && pendingClicks.has(normalizedClickId)) {
+        const click = pendingClicks.get(normalizedClickId);
+        pendingClicks.delete(normalizedClickId);
+        if (click && click._timeout) clearTimeout(click._timeout);
+        displayCoordinates(click.x, click.y, click.label || 'Device Tap', normalizedClickId, data.guessed_key);
     } else if (normalizedClickId) {
         pendingAIGuesses.set(normalizedClickId, data.guessed_key);
         setTimeout(() => pendingAIGuesses.delete(normalizedClickId), 5000);
     }
+
+    // Update AI suggestion badge for immediate visibility
+    const aiSuggestion = document.getElementById('ai-suggestion');
+    const aiSuggestionText = document.getElementById('ai-suggestion-text');
+    if (aiSuggestion && aiSuggestionText) {
+        aiSuggestionText.innerText = data.guessed_key;
+        aiSuggestion.style.display = 'block';
+    }
 });
 
 socket.on('device_click_broadcast', (data) => {
+    logRawPayload('device_click_broadcast', data);
     if (typeof data.x === 'number' && typeof data.y === 'number') {
-        displayCoordinates(data.x, data.y, data.label || 'Device Tap', data.clickId);
+        const cid = data.clickId ? String(data.clickId) : String(Date.now());
+        const aiGuess = cid ? pendingAIGuesses.get(cid) : null;
+        const candidateLabel = inferScreenLabel(data.x, data.y, data.label || 'Device Tap', aiGuess);
+
+        if (candidateLabel && candidateLabel.toLowerCase().includes('screen area') && !aiGuess) {
+            const t = setTimeout(() => {
+                if (pendingClicks.has(cid)) {
+                    const c = pendingClicks.get(cid);
+                    pendingClicks.delete(cid);
+                    displayCoordinates(c.x, c.y, c.label || 'Screen Area', cid, null, {
+                        originalX: c.originalX,
+                        originalY: c.originalY,
+                        originalLabel: c.originalLabel
+                    });
+                }
+            }, 800);
+
+            pendingClicks.set(cid, {
+                x: data.x,
+                y: data.y,
+                label: data.label || 'Device Tap',
+                originalX: data.originalX,
+                originalY: data.originalY,
+                originalLabel: data.originalLabel,
+                _timeout: t
+            });
+        } else {
+            displayCoordinates(data.x, data.y, data.label || 'Device Tap', cid, aiGuess || null, {
+                originalX: data.originalX,
+                originalY: data.originalY,
+                originalLabel: data.originalLabel
+            });
+        }
     }
 });
 
@@ -179,9 +354,7 @@ function startSharing() {
     document.getElementById('active-info').style.display = 'block';
     document.getElementById('display-room-id').innerText = roomId;
     dinoLoader.style.display = 'flex';
-    dinoLoader2.style.display = 'flex';
     socket.emit("join", roomId);
-    updateStatus("Connecting...", false);
     createPeerConnection(roomId);
 }
 
@@ -191,10 +364,7 @@ function refreshConnection() {
     if (peerConnection) peerConnection.close();
     peerConnection = null;
     dataChannel = null;
-    remoteVideo.style.display = 'none';
-    remoteVideo2.style.display = 'none';
     dinoLoader.style.display = 'flex';
-    dinoLoader2.style.display = 'flex';
     socket.emit("join", roomId);
     createPeerConnection(roomId);
 }
@@ -220,12 +390,6 @@ function wakeDevice() {
     if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify({ type: 'wake' }));
 }
 
-function toggleSecurityOverride() {
-    const btn = document.getElementById('security-mode');
-    const isAct = btn.classList.toggle('active-mode');
-    btn.innerHTML = isAct ? '<i class="fas fa-eye"></i> ON' : '<i class="fas fa-shield-alt"></i> Override';
-}
-
 function sendTypeText() {
     const input = document.getElementById('remote-type-input');
     if (input.value && dataChannel?.readyState === 'open') {
@@ -237,6 +401,27 @@ function sendTypeText() {
 function clearClickLog() {
     clickCount = 0;
     document.getElementById('click-log-content').innerHTML = '<div style="color: #666; font-style: italic; text-align: center; padding: 10px;">Waiting...</div>';
+}
+
+function logRawPayload(label, payload) {
+    const box = document.getElementById('debug-payload-log');
+    if (!box) return;
+    const stamp = new Date().toLocaleTimeString();
+
+    // Remove placeholder text on first real payload so it doesn't stay visible.
+    if (box.children.length === 1 && box.firstChild.textContent?.includes('No payloads yet.')) {
+        box.innerHTML = '';
+    }
+
+    const entry = document.createElement('div');
+    entry.style.marginBottom = '6px';
+    entry.style.borderTop = '1px solid rgba(255,255,255,0.08)';
+    entry.style.paddingTop = '6px';
+    entry.innerHTML = `<div style="color:#00ff88;">${stamp} • ${label}</div><div>${JSON.stringify(payload)}</div>`;
+    box.insertBefore(entry, box.firstChild);
+    if (box.children.length > 12) {
+        box.removeChild(box.lastChild);
+    }
 }
 
 socket.on("message", async (data) => {
@@ -253,13 +438,14 @@ socket.on("message", async (data) => {
     }
 });
 
-function handleInteraction(e, element) {
-    if (element.style.display === 'none') return;
-    const rect = element.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    if (dataChannel?.readyState === 'open') dataChannel.send(JSON.stringify({ type: 'click', x, y, clickId: Date.now() }));
-}
-
-remoteVideo.addEventListener('mousedown', (e) => handleInteraction(e, remoteVideo));
-remoteVideo2.addEventListener('mousedown', (e) => handleInteraction(e, remoteVideo2));
+// Coordinate conversion for clicks
+remoteVideo.addEventListener('mousedown', (e) => {
+    if (remoteVideo.style.display === 'none') return;
+    const rect = remoteVideo.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    if (dataChannel?.readyState === 'open') {
+        dataChannel.send(JSON.stringify({ type: 'click', x, y, clickId: Date.now() }));
+        showRemoteClickIndicator(x, y, 'Local Click');
+    }
+});
