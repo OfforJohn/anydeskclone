@@ -393,7 +393,12 @@ function toggleSyntheticWelcome() {
     syntheticWelcomeEnabled = !syntheticWelcomeEnabled;
     localStorage.setItem('syntheticWelcomeEnabled', syntheticWelcomeEnabled ? 'true' : 'false');
     // Allow re-showing after toggle on by clearing shown tracker
-    if (syntheticWelcomeEnabled) syntheticWelcomeShown.clear();
+    if (syntheticWelcomeEnabled) {
+        syntheticWelcomeShown.clear();
+    } else {
+        // Hide Welcome UI immediately when disabled
+        resetWelcomeUI();
+    }
     updateWelcomeToggleUI();
 }
 
