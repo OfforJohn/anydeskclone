@@ -26,6 +26,7 @@ const aiCanvas = document.getElementById('ai-canvas');
 const aiCtx = aiCanvas.getContext('2d');
 const aiOverlay = document.getElementById('draw-overlay-2');
 const aiOverlayCtx = aiOverlay ? aiOverlay.getContext('2d') : null;
+const remoteContainer = document.getElementById('remote-container');
 
 // Pulses storage for timed annotation rendering
 const aiPulses = [];
@@ -128,6 +129,17 @@ function drawAIElement(x, y, label) {
     aiCtx.strokeRect(realX - 25, realY - 25, 50, 50);
 }
 
+function showRemoteClickIndicator(x, y, label = 'Tap') {
+    if (!remoteContainer) return;
+    const indicator = document.createElement('div');
+    indicator.className = 'remote-tap-indicator';
+    indicator.title = label;
+    indicator.style.left = `${(x * 100).toFixed(1)}%`;
+    indicator.style.top = `${(y * 100).toFixed(1)}%`;
+    remoteContainer.appendChild(indicator);
+    setTimeout(() => indicator.remove(), 800);
+}
+
 // --- PEER CONNECTION ---
 async function createPeerConnection(roomId) {
     if (peerConnection) return;
@@ -181,6 +193,12 @@ function displayCoordinates(x, y, source = "Tap", clickId = null, aiGuess = null
 
     // Draw on AI Canvas
     drawAIElement(x, y, effectiveAiGuess || source);
+    // Also show a transient indicator on the main remote container
+    try {
+        showRemoteClickIndicator(x, y, effectiveAiGuess || source);
+    } catch (e) {
+        console.warn('[UI] showRemoteClickIndicator failed', e);
+    }
 
     if (normalizedClickId) {
         const existing = logContent.querySelector(`.log-entry[data-click-id="${normalizedClickId}"]`);
