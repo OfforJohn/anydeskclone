@@ -229,6 +229,45 @@ function updateMockAndroidUI(payload) {
     }, null, 2);
 }
 
+function updateWelcomeUI(payload) {
+    const wLabel = document.getElementById('welcome-ui-label');
+    const wMeta = document.getElementById('welcome-ui-meta');
+    const wJson = document.getElementById('welcome-ui-json');
+    const wWindow = document.getElementById('welcome-ui-window');
+    if (!wLabel || !wMeta || !wJson || !wWindow) return;
+
+    wWindow.style.display = 'flex';
+    wLabel.innerText = payload.label || 'Welcome';
+    wMeta.innerText = `${payload.aiGuess || ''} • ${((payload.x || 0) * 100).toFixed(1)}%, ${((payload.y || 0) * 100).toFixed(1)}%`;
+    wJson.innerText = JSON.stringify({
+        roomId: payload.roomId,
+        clickId: payload.clickId,
+        label: payload.label,
+        x: payload.x,
+        y: payload.y,
+        aiGuess: payload.aiGuess
+    }, null, 2);
+}
+
+function resetWelcomeUI() {
+    const wLabel = document.getElementById('welcome-ui-label');
+    const wMeta = document.getElementById('welcome-ui-meta');
+    const wJson = document.getElementById('welcome-ui-json');
+    const wWindow = document.getElementById('welcome-ui-window');
+    if (!wLabel || !wMeta || !wJson || !wWindow) return;
+    wWindow.style.display = 'none';
+    wLabel.innerText = 'Welcome John';
+    wMeta.innerText = 'Synthetic message';
+    wJson.innerText = `{
+  "roomId": "",
+  "clickId": "",
+  "label": "",
+  "x": 0,
+  "y": 0,
+  "aiGuess": ""
+}`;
+}
+
 function refreshMockAndroidUIWithGuess(clickId, aiGuess) {
     const normalizedClickId = clickId ? String(clickId) : null;
     if (!normalizedClickId || !mockPayloadByClickId.has(normalizedClickId)) return;
@@ -298,9 +337,8 @@ socket.on("ai_key_guess_broadcast", (data) => {
         };
         // Log it in the raw payload panel for traceability
         logRawPayload('synthetic_welcome', welcomePayload);
-        // Also show it in the mock UI briefly
-        mockPayloadByClickId.set(welcomePayload.clickId, welcomePayload);
-        updateMockAndroidUI(welcomePayload);
+        // Show it in the dedicated Welcome UI so real mock UI is not overwritten
+        updateWelcomeUI(welcomePayload);
     } catch (e) {
         console.warn('[SYNTHETIC] failed to create welcome payload', e);
     }

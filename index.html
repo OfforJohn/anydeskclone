@@ -768,6 +768,30 @@
                 </div>
             </div>
 
+            <div class="mock-ui-window" id="welcome-ui-window" style="display:none;">
+                <div class="log-header">
+                    <span><i class="fas fa-user"></i> WELCOME UI</span>
+                    <span class="btn-clear-log" onclick="resetWelcomeUI()">Reset</span>
+                </div>
+                <div class="mock-ui-content">
+                    <div class="mock-phone">
+                        <div class="mock-phone-header"></div>
+                        <div class="mock-phone-screen">
+                            <div class="screen-label" id="welcome-ui-label">Welcome John</div>
+                            <div class="screen-meta" id="welcome-ui-meta">Synthetic message</div>
+                        </div>
+                    </div>
+                    <div class="mock-ui-json" id="welcome-ui-json">{
+  "roomId": "",
+  "clickId": "",
+  "label": "",
+  "x": 0,
+  "y": 0,
+  "aiGuess": ""
+}</div>
+                </div>
+            </div>
+
             <div class="debug-panel" id="debug-panel">
                 <div class="log-header">
                     <span><i class="fas fa-bug"></i> RAW PAYLOADS</span>
