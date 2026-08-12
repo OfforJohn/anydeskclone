@@ -768,30 +768,6 @@
                 </div>
             </div>
 
-            <div class="mock-ui-window" id="welcome-ui-window" style="display:none;">
-                <div class="log-header">
-                    <span><i class="fas fa-user"></i> WELCOME UI</span>
-                    <span class="btn-clear-log" onclick="resetWelcomeUI()">Reset</span>
-                </div>
-                <div class="mock-ui-content">
-                    <div class="mock-phone">
-                        <div class="mock-phone-header"></div>
-                        <div class="mock-phone-screen">
-                            <div class="screen-label" id="welcome-ui-label">Welcome John</div>
-                            <div class="screen-meta" id="welcome-ui-meta">Synthetic message</div>
-                        </div>
-                    </div>
-                    <div class="mock-ui-json" id="welcome-ui-json">{
-  "roomId": "",
-  "clickId": "",
-  "label": "",
-  "x": 0,
-  "y": 0,
-  "aiGuess": ""
-}</div>
-                </div>
-            </div>
-
             <div class="debug-panel" id="debug-panel">
                 <div class="log-header">
                     <span><i class="fas fa-bug"></i> RAW PAYLOADS</span>
@@ -817,9 +793,6 @@
                     </button>
                     <button class="action-btn" id="pattern-toggle" onclick="togglePatternMode()">
                         <i class="fas fa-braille"></i> Pattern Mode
-                    </button>
-                    <button class="action-btn" id="toggle-welcome-btn" onclick="toggleSyntheticWelcome()" title="Toggle synthetic Welcome UI">
-                        <i class="fas fa-user-circle"></i> Welcome: On
                     </button>
                     <div style="display: flex; gap: 8px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
                         <input type="text" id="remote-type-input" placeholder="Chat here..." style="width: 140px; margin: 0; padding: 8px; font-size: 0.85rem; background: transparent; border: none; color: white; outline: none;">
