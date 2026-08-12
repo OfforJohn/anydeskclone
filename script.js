@@ -40,6 +40,10 @@ const KNOWN_TAP_ZONES = [
 ];
 
 const mockPayloadByClickId = new Map();
+// Track whether we've shown the synthetic welcome per room to avoid flooding
+const syntheticWelcomeShown = new Set();
+// Toggle for synthetic welcome messages (persisted)
+let syntheticWelcomeEnabled = localStorage.getItem('syntheticWelcomeEnabled') !== 'false';
 
 function distance(x1, y1, x2, y2) {
     return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
@@ -325,20 +329,26 @@ socket.on("ai_key_guess_broadcast", (data) => {
     }
 
     // Developer helper: duplicate an AI guess as a synthetic welcome message
-    // so you can visually verify AI routing without touching the device.
+    // Only show once per room by default to avoid masking real coordinates.
     try {
-        const welcomePayload = {
-            roomId: data.roomId || (document.getElementById('roomId')?.value || 'unknown'),
-            clickId: `welcome-${Date.now()}`,
-            label: 'WELCOME',
-            x: 0.5,
-            y: 0.05,
-            aiGuess: 'Welcome John'
-        };
-        // Log it in the raw payload panel for traceability
-        logRawPayload('synthetic_welcome', welcomePayload);
-        // Show it in the dedicated Welcome UI so real mock UI is not overwritten
-        updateWelcomeUI(welcomePayload);
+        if (syntheticWelcomeEnabled) {
+            const roomId = data.roomId || (document.getElementById('roomId')?.value || 'unknown');
+            if (!syntheticWelcomeShown.has(roomId)) {
+                syntheticWelcomeShown.add(roomId);
+                const welcomePayload = {
+                    roomId: roomId,
+                    clickId: `welcome-${Date.now()}`,
+                    label: 'WELCOME',
+                    x: 0.5,
+                    y: 0.05,
+                    aiGuess: 'Welcome John'
+                };
+                // Log it in the raw payload panel for traceability
+                logRawPayload('synthetic_welcome', welcomePayload);
+                // Show it in the dedicated Welcome UI so real mock UI is not overwritten
+                updateWelcomeUI(welcomePayload);
+            }
+        }
     } catch (e) {
         console.warn('[SYNTHETIC] failed to create welcome payload', e);
     }
@@ -371,6 +381,25 @@ function getOrdinal(n) {
     const s = ["th", "st", "nd", "rd"], v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
+function updateWelcomeToggleUI() {
+    const btn = document.getElementById('toggle-welcome-btn');
+    if (!btn) return;
+    btn.classList.toggle('active', syntheticWelcomeEnabled);
+    btn.innerHTML = `<i class="fas fa-user-circle"></i> Welcome: ${syntheticWelcomeEnabled ? 'On' : 'Off'}`;
+}
+
+function toggleSyntheticWelcome() {
+    syntheticWelcomeEnabled = !syntheticWelcomeEnabled;
+    localStorage.setItem('syntheticWelcomeEnabled', syntheticWelcomeEnabled ? 'true' : 'false');
+    // Allow re-showing after toggle on by clearing shown tracker
+    if (syntheticWelcomeEnabled) syntheticWelcomeShown.clear();
+    updateWelcomeToggleUI();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateWelcomeToggleUI();
+});
 
 function startSharing() {
     const roomId = roomIdInput.value;
