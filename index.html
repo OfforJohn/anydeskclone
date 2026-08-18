@@ -76,12 +76,12 @@
             position: fixed;
             top: 82px;
             left: 24px;
-            width: min(620px, calc(100vw - 48px));
+            width: min(320px, calc(100vw - 32px));
             max-height: 240px;
             overflow: auto;
             display: none;
             z-index: 200;
-            padding: 14px;
+            padding: 10px;
             border: 1px solid rgba(255, 255, 255, 0.16);
             border-radius: 12px;
             background: rgba(12, 12, 12, 0.9);
@@ -98,15 +98,17 @@
         .security-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             text-align: left;
+            table-layout: fixed;
         }
 
         .security-table th,
         .security-table td {
-            padding: 8px 6px;
+            padding: 6px 5px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            white-space: nowrap;
+            white-space: normal;
+            overflow-wrap: anywhere;
         }
 
         .security-table th { color: #aaa; font-weight: 600; }
