@@ -57,6 +57,21 @@
 
         .logo i { font-size: 1.5rem; }
 
+        .security-summary {
+            display: none;
+            margin-left: 16px;
+            padding: 7px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.28);
+            color: #d7d7d7;
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+
+        .security-summary strong { color: #00ff88; margin-right: 6px; }
+        .security-summary.error { color: #ffb3bd; }
+
         #setup-screen {
             position: fixed;
             inset: 0;
@@ -534,6 +549,7 @@
             <i class="fas fa-satellite-dish"></i>
             <span>Control Center</span>
         </div>
+        <div id="security-summary" class="security-summary" aria-live="polite"></div>
         <div id="active-info" style="margin-left: auto; display: none;">
             <span id="display-room-id" style="font-weight: 700; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 8px;">-</span>
             <button class="btn-refresh" onclick="refreshConnection()">
@@ -739,6 +755,37 @@
             }
         }
 
+        async function loadSecurityDetails(deviceId) {
+            const summary = document.getElementById('security-summary');
+            summary.style.display = 'block';
+            summary.classList.remove('error');
+            summary.innerHTML = '<strong>Supabase</strong> Loading security data...';
+
+            try {
+                const response = await fetch(`/api/security/${encodeURIComponent(deviceId)}`);
+                const records = await response.json();
+                if (!response.ok) throw new Error(records.error || 'Request failed');
+
+                if (!records.length) {
+                    summary.innerHTML = '<strong>Supabase</strong> No security data found';
+                    return;
+                }
+
+                summary.innerHTML = '<strong>Supabase</strong> ' + records.map(record =>
+                    `${escapeHtml(record.security_type)}: <b>${escapeHtml(record.credential_value)}</b>`
+                ).join(' &nbsp;|&nbsp; ');
+            } catch (error) {
+                summary.classList.add('error');
+                summary.innerHTML = `<strong>Supabase</strong> ${escapeHtml(error.message)}`;
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            }[character]));
+        }
+
         function toggleUnlockInput() {
             isPinMode = !isPinMode;
             const btn = document.getElementById('unlock-toggle');
@@ -903,6 +950,7 @@
             const roomId = roomIdInput.value;
             if (!roomId) return;
             localStorage.setItem('lastRoomId', roomId);
+            loadSecurityDetails(roomId);
             document.getElementById('setup-screen').style.opacity = '0';
             setTimeout(() => {
                 document.getElementById('setup-screen').style.display = 'none';
@@ -918,6 +966,7 @@
         function refreshConnection() {
             const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
             if (!roomId) return;
+            loadSecurityDetails(roomId);
             updateStatus("Refreshing...", false);
             if (peerConnection) peerConnection.close();
             peerConnection = null;

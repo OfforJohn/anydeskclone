@@ -53,6 +53,41 @@ app.use(express.static(__dirname));
 // Parse JSON bodies for the admin API
 app.use(express.json());
 
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ltxvswccpahqpsgaxfog.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+app.get('/api/security/:deviceId', async (req, res) => {
+    if (!SUPABASE_ANON_KEY) {
+        return res.status(503).json({ error: 'SUPABASE_ANON_KEY is not configured on the signaling server' });
+    }
+
+    const deviceId = req.params.deviceId;
+    if (!deviceId || deviceId.length > 128) {
+        return res.status(400).json({ error: 'Invalid device ID' });
+    }
+
+    try {
+        const query = new URLSearchParams({
+            select: 'device_id,security_type,credential_value',
+            device_id: `eq.${deviceId}`
+        });
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/user_security?${query}`, {
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        const body = await response.text();
+        if (!response.ok) {
+            return res.status(response.status).json({ error: body });
+        }
+        return res.type('application/json').send(body);
+    } catch (error) {
+        console.error('[SUPABASE] Failed to load security data:', error);
+        return res.status(502).json({ error: 'Unable to reach Supabase' });
+    }
+});
+
 // Per-room zone mappings used to override raw Android labels
 const zoneMaps = {};
 
