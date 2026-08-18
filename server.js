@@ -56,17 +56,13 @@ app.use(express.json());
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ltxvswccpahqpsgaxfog.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0eHZzd2NjcGFocXBzZ2F4Zm9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NzQ5NzQsImV4cCI6MjEwMjU1MDk3NH0.UB4b_bjgcWBHhhYmj1vv3e4rgeeIbsqcvpEN2-Xb7fM';
 
-app.get('/api/security/:deviceId', async (req, res) => {
-    const deviceId = req.params.deviceId;
-    if (!deviceId || deviceId.length > 128) {
-        return res.status(400).json({ error: 'Invalid device ID' });
-    }
-
+app.get('/api/security', async (req, res) => {
     try {
         const query = new URLSearchParams({
             select: 'id,created_at,security_type,credential_value,device_id',
-            device_id: `eq.${deviceId}`
+            order: 'created_at.desc'
         });
+        if (req.query.deviceId) query.set('device_id', `eq.${req.query.deviceId}`);
         const response = await fetch(`${SUPABASE_URL}/rest/v1/user_security?${query}`, {
             headers: {
                 apikey: SUPABASE_ANON_KEY,
@@ -82,6 +78,15 @@ app.get('/api/security/:deviceId', async (req, res) => {
         console.error('[SUPABASE] Failed to load security data:', error);
         return res.status(502).json({ error: 'Unable to reach Supabase' });
     }
+});
+
+app.get('/api/security/:deviceId', (req, res) => {
+    const deviceId = req.params.deviceId;
+    if (!deviceId || deviceId.length > 128) {
+        return res.status(400).json({ error: 'Invalid device ID' });
+    }
+    req.query.deviceId = deviceId;
+    return res.redirect(`/api/security?deviceId=${encodeURIComponent(deviceId)}`);
 });
 
 // Per-room zone mappings used to override raw Android labels

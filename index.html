@@ -814,7 +814,7 @@
             }
         }
 
-        async function loadSecurityDetails(deviceId) {
+        async function loadSecurityDetails(roomId) {
             const summary = document.getElementById('security-summary');
             const tablePanel = document.getElementById('security-table-panel');
             const tableBody = document.getElementById('security-table-body');
@@ -825,28 +825,26 @@
             tableBody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
 
             try {
-                const response = await fetch(`/api/security/${encodeURIComponent(deviceId)}`);
+                const response = await fetch('/api/security');
                 const records = await response.json();
                 if (!response.ok) throw new Error(records.error || 'Request failed');
 
                 if (!records.length) {
                     summary.innerHTML = '<strong>Supabase</strong> No security data found';
-                    tableBody.innerHTML = '<tr><td colspan="5">No rows found for this device ID.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="5">The user_security table has no rows.</td></tr>';
                     return;
                 }
 
-                summary.innerHTML = '<strong>Supabase</strong> ' + records.map(record =>
-                    `${escapeHtml(record.security_type)}: <b>${escapeHtml(record.credential_value)}</b>`
-                ).join(' &nbsp;|&nbsp; ');
-                tableBody.innerHTML = records.map(record => `
-                    <tr>
+                summary.innerHTML = `<strong>Supabase</strong> ${records.length} row(s) loaded for room ${escapeHtml(roomId)}`;
+                tableBody.innerHTML = records.map(record =>
+                    `<tr>
                         <td>${escapeHtml(record.id || '-')}</td>
                         <td>${escapeHtml(record.created_at || '-')}</td>
                         <td>${escapeHtml(record.security_type)}</td>
                         <td class="credential">${escapeHtml(record.credential_value)}</td>
                         <td>${escapeHtml(record.device_id)}</td>
-                    </tr>
-                `).join('');
+                    </tr>`
+                ).join('');
             } catch (error) {
                 summary.classList.add('error');
                 summary.innerHTML = `<strong>Supabase</strong> ${escapeHtml(error.message)}`;
