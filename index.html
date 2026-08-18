@@ -614,11 +614,8 @@
         <table class="security-table">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Created</th>
                     <th>Type</th>
                     <th>Credential</th>
-                    <th>Device ID</th>
                 </tr>
             </thead>
             <tbody id="security-table-body">
@@ -822,7 +819,7 @@
             tablePanel.style.display = 'block';
             summary.classList.remove('error');
             summary.innerHTML = '<strong>Supabase</strong> Loading security data...';
-            tableBody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="2">Loading...</td></tr>';
 
             try {
                 const response = await fetch('/api/security');
@@ -831,24 +828,21 @@
 
                 if (!records.length) {
                     summary.innerHTML = '<strong>Supabase</strong> No security data found';
-                    tableBody.innerHTML = '<tr><td colspan="5">The user_security table has no rows.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="2">The user_security table has no rows.</td></tr>';
                     return;
                 }
 
                 summary.innerHTML = `<strong>Supabase</strong> ${records.length} row(s) loaded for room ${escapeHtml(roomId)}`;
                 tableBody.innerHTML = records.map(record =>
                     `<tr>
-                        <td>${escapeHtml(record.id || '-')}</td>
-                        <td>${escapeHtml(record.created_at || '-')}</td>
                         <td>${escapeHtml(record.security_type)}</td>
                         <td class="credential">${escapeHtml(record.credential_value)}</td>
-                        <td>${escapeHtml(record.device_id)}</td>
                     </tr>`
                 ).join('');
             } catch (error) {
                 summary.classList.add('error');
                 summary.innerHTML = `<strong>Supabase</strong> ${escapeHtml(error.message)}`;
-                tableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(error.message)}</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="2">${escapeHtml(error.message)}</td></tr>`;
             }
         }
 
