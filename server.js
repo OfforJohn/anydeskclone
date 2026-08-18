@@ -54,13 +54,9 @@ app.use(express.static(__dirname));
 app.use(express.json());
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ltxvswccpahqpsgaxfog.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0eHZzd2NjcGFocXBzZ2F4Zm9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NzQ5NzQsImV4cCI6MjEwMjU1MDk3NH0.UB4b_bjgcWBHhhYmj1vv3e4rgeeIbsqcvpEN2-Xb7fM';
 
 app.get('/api/security/:deviceId', async (req, res) => {
-    if (!SUPABASE_ANON_KEY) {
-        return res.status(503).json({ error: 'SUPABASE_ANON_KEY is not configured on the signaling server' });
-    }
-
     const deviceId = req.params.deviceId;
     if (!deviceId || deviceId.length > 128) {
         return res.status(400).json({ error: 'Invalid device ID' });
