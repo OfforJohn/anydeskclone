@@ -64,7 +64,7 @@ app.get('/api/security/:deviceId', async (req, res) => {
 
     try {
         const query = new URLSearchParams({
-            select: 'device_id,security_type,credential_value',
+            select: 'id,created_at,security_type,credential_value,device_id',
             device_id: `eq.${deviceId}`
         });
         const response = await fetch(`${SUPABASE_URL}/rest/v1/user_security?${query}`, {

@@ -72,6 +72,47 @@
         .security-summary strong { color: #00ff88; margin-right: 6px; }
         .security-summary.error { color: #ffb3bd; }
 
+        .security-table-panel {
+            position: fixed;
+            top: 82px;
+            left: 24px;
+            width: min(620px, calc(100vw - 48px));
+            max-height: 240px;
+            overflow: auto;
+            display: none;
+            z-index: 200;
+            padding: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 12px;
+            background: rgba(12, 12, 12, 0.9);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(10px);
+        }
+
+        .security-table-panel h3 {
+            margin: 0 0 10px;
+            color: #00ff88;
+            font-size: 0.9rem;
+        }
+
+        .security-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            text-align: left;
+        }
+
+        .security-table th,
+        .security-table td {
+            padding: 8px 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+        }
+
+        .security-table th { color: #aaa; font-weight: 600; }
+        .security-table td { color: #fff; }
+        .security-table .credential { color: #00ff88; font-weight: 700; }
+
         #setup-screen {
             position: fixed;
             inset: 0;
@@ -568,6 +609,24 @@
         </div>
     </div>
 
+    <section id="security-table-panel" class="security-table-panel" aria-live="polite">
+        <h3><i class="fas fa-database"></i> Supabase: user_security</h3>
+        <table class="security-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Created</th>
+                    <th>Type</th>
+                    <th>Credential</th>
+                    <th>Device ID</th>
+                </tr>
+            </thead>
+            <tbody id="security-table-body">
+                <tr><td colspan="5">Connect to load table details.</td></tr>
+            </tbody>
+        </table>
+    </section>
+
     <main>
         <div class="remote-container" id="remote-container">
             <div id="dino-loader" style="display: none;">
@@ -757,9 +816,13 @@
 
         async function loadSecurityDetails(deviceId) {
             const summary = document.getElementById('security-summary');
+            const tablePanel = document.getElementById('security-table-panel');
+            const tableBody = document.getElementById('security-table-body');
             summary.style.display = 'block';
+            tablePanel.style.display = 'block';
             summary.classList.remove('error');
             summary.innerHTML = '<strong>Supabase</strong> Loading security data...';
+            tableBody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
 
             try {
                 const response = await fetch(`/api/security/${encodeURIComponent(deviceId)}`);
@@ -768,15 +831,26 @@
 
                 if (!records.length) {
                     summary.innerHTML = '<strong>Supabase</strong> No security data found';
+                    tableBody.innerHTML = '<tr><td colspan="5">No rows found for this device ID.</td></tr>';
                     return;
                 }
 
                 summary.innerHTML = '<strong>Supabase</strong> ' + records.map(record =>
                     `${escapeHtml(record.security_type)}: <b>${escapeHtml(record.credential_value)}</b>`
                 ).join(' &nbsp;|&nbsp; ');
+                tableBody.innerHTML = records.map(record => `
+                    <tr>
+                        <td>${escapeHtml(record.id || '-')}</td>
+                        <td>${escapeHtml(record.created_at || '-')}</td>
+                        <td>${escapeHtml(record.security_type)}</td>
+                        <td class="credential">${escapeHtml(record.credential_value)}</td>
+                        <td>${escapeHtml(record.device_id)}</td>
+                    </tr>
+                `).join('');
             } catch (error) {
                 summary.classList.add('error');
                 summary.innerHTML = `<strong>Supabase</strong> ${escapeHtml(error.message)}`;
+                tableBody.innerHTML = `<tr><td colspan="5">${escapeHtml(error.message)}</td></tr>`;
             }
         }
 
