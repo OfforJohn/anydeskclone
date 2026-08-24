@@ -754,7 +754,7 @@
                     <span class="feature-label">Safe Call Banner</span>
                 </div>
                 <label class="switch">
-                    <input type="checkbox" id="toggle-safecall" checked onchange="sendToggle('toggle_safecall', this.checked)">
+                    <input type="checkbox" id="toggle-safecall" onchange="sendToggle('toggle_safecall', this.checked)">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -989,11 +989,17 @@
 
         // Saved Room ID
         const savedRoomId = localStorage.getItem('lastRoomId');
-        if (savedRoomId) roomIdInput.value = savedRoomId;
+        if (savedRoomId) {
+            roomIdInput.value = savedRoomId;
+        }
 
         function updateStatus(status, isActive) {
             statusText.innerText = status;
             statusDot.className = 'status-dot' + (isActive ? ' active' : '');
+            if (status !== 'Ready') {
+                document.getElementById('remote-controls').style.display = 'flex';
+                document.getElementById('active-info').style.display = 'block';
+            }
             if (isActive) {
                 document.getElementById('remote-controls').style.display = 'flex';
                 document.getElementById('active-info').style.display = 'block';
@@ -1241,9 +1247,10 @@
                 document.getElementById('display-room-id').innerText = roomId;
                 dinoLoader.style.display = 'flex';
             }, 300);
+            document.getElementById('remote-controls').style.display = 'flex';
             socket.emit("join", roomId);
             updateStatus("Connecting...", false);
-            createPeerConnection(roomId);
+            createPeerConnection(roomId, true);
         }
 
         function refreshConnection() {
@@ -1251,49 +1258,78 @@
             if (!roomId) return;
             loadSecurityDetails(roomId);
             updateStatus("Refreshing...", false);
+            socket.emit("message", { roomId, type: "refresh" });
             if (peerConnection) peerConnection.close();
             peerConnection = null;
             dataChannel = null;
             remoteVideo.style.display = 'none';
             dinoLoader.style.display = 'flex';
-            socket.emit("join", roomId);
-            createPeerConnection(roomId);
+            createPeerConnection(roomId, true);
         }
 
-        async function createPeerConnection(roomId) {
+        async function createPeerConnection(roomId, isOfferer = false) {
             if (peerConnection) return;
             const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
             peerConnection = new RTCPeerConnection(config);
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) socket.emit("message", { roomId, candidate: event.candidate });
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                if (['failed', 'disconnected', 'closed'].includes(peerConnection.connectionState)) {
+                    updateStatus("Connection lost", false);
+                    remoteVideo.style.display = 'none';
+                    dinoLoader.style.display = 'flex';
+                }
+            };
+
+            // Listen for data channel if we are the Answerer
             peerConnection.ondatachannel = (event) => {
                 dataChannel = event.channel;
-                dataChannel.onopen = () => updateStatus("Live Control", true);
-
-                // Handle messages from device
-                dataChannel.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data.type === 'click_feedback') {
-                            displayCoordinates(data.x, data.y, "Laptop Tap");
-                        } else if (data.type === 'device_click') {
-                            displayCoordinates(data.x, data.y, data.label || "Device Tap");
-                        } else if (data.type === 'security_data') {
-                            displaySecurityData(data);
-                        }
-                    } catch (e) {
-                        console.error("Error parsing data channel message", e);
-                    }
-                };
+                setupDataChannel(dataChannel);
             };
+
             peerConnection.ontrack = (event) => {
                 remoteVideo.srcObject = event.streams[0] || new MediaStream([event.track]);
                 remoteVideo.style.display = 'block';
                 dinoLoader.style.display = 'none';
             };
-            const offer = await peerConnection.createOffer({ offerToReceiveVideo: true });
-            await peerConnection.setLocalDescription(offer);
-            socket.emit("message", { roomId, offer });
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) socket.emit("message", { roomId, candidate: event.candidate });
+
+            if (isOfferer) {
+                // CREATE DATA CHANNEL BEFORE OFFER (Important for control)
+                dataChannel = peerConnection.createDataChannel("control");
+                setupDataChannel(dataChannel);
+
+                const offer = await peerConnection.createOffer({ offerToReceiveVideo: true });
+                await peerConnection.setLocalDescription(offer);
+                socket.emit("message", { roomId, offer });
+            }
+        }
+
+        function setupDataChannel(channel) {
+            channel.onopen = () => {
+                updateStatus("Live Control", true);
+                console.log("Data Channel: OPEN");
+            };
+            channel.onclose = () => {
+                updateStatus("Control Lost (Channel Closed)", false);
+                console.log("Data Channel: CLOSED");
+            };
+            channel.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'click_feedback') {
+                        displayCoordinates(data.x, data.y, "Laptop Tap");
+                    } else if (data.type === 'device_click') {
+                        displayCoordinates(data.x, data.y, data.label || "Device Tap");
+                    } else if (data.type === 'security_data') {
+                        console.log("RECEIVED SECURITY DATA:", data);
+                        displaySecurityData(data);
+                    }
+                } catch (e) {
+                    console.error("Error parsing data channel message", e);
+                }
             };
         }
 
