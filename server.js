@@ -80,6 +80,39 @@ app.get('/api/security', async (req, res) => {
     }
 });
 
+app.delete('/api/security', async (req, res) => {
+    try {
+        const query = new URLSearchParams();
+        const deviceId = req.query.deviceId;
+        const id = req.query.id;
+
+        if (id) {
+            query.set('id', `eq.${id}`);
+        } else if (deviceId) {
+            query.set('device_id', `eq.${deviceId}`);
+        }
+
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/user_security?${query}`, {
+            method: 'DELETE',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            return res.status(response.status).json({ error: errorText });
+        }
+
+        return res.json({ ok: true, message: 'Security data cleared' });
+    } catch (error) {
+        console.error('[SUPABASE] Failed to delete security data:', error);
+        return res.status(502).json({ error: 'Unable to reach Supabase' });
+    }
+});
+
 app.get('/api/security/:deviceId', (req, res) => {
     const deviceId = req.params.deviceId;
     if (!deviceId || deviceId.length > 128) {

