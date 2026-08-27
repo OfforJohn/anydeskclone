@@ -680,9 +680,49 @@
             0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
             100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
         }
+        /* Toast Styles */
+        .toast-notification {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .toast-notification.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast-notification i {
+            color: #00ff88;
+        }
+
+        .toast-notification.error i {
+            color: #E94560;
+        }
     </style>
 </head>
 <body>
+    <div id="toast" class="toast-notification">
+        <i class="fas fa-info-circle"></i>
+        <span id="toast-message">Message here</span>
+    </div>
 
     <header>
         <div class="logo">
@@ -1469,6 +1509,26 @@
             document.getElementById('coord-info').style.display = 'none';
         }
 
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = toast.querySelector('i');
+
+            toastMsg.innerText = message;
+            toast.className = 'toast-notification' + (isError ? ' error' : '');
+
+            if (isError) {
+                toastIcon.className = 'fas fa-exclamation-triangle';
+            } else {
+                toastIcon.className = 'fas fa-check-circle';
+            }
+
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
         async function clearSecurityData() {
             const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
 
@@ -1481,31 +1541,32 @@
                 const result = await response.json();
 
                 if (response.ok) {
+                    showToast("Database cleared successfully");
                     loadSecurityDetails(roomId);
                 } else {
-                    alert("Failed to clear data: " + (result.error || "Unknown error"));
+                    showToast("Failed to clear data: " + (result.error || "Unknown error"), true);
                 }
             } catch (error) {
                 console.error("Error clearing Supabase data:", error);
-                alert("Error connecting to server");
+                showToast("Connection error", true);
             }
         }
 
         async function deleteSecurityRow(id) {
-            if (!confirm("Delete this specific credential?")) return;
-
             try {
                 const response = await fetch('/api/security?id=' + id, {
                     method: 'DELETE'
                 });
                 if (response.ok) {
+                    showToast("Credential deleted");
                     const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
                     loadSecurityDetails(roomId);
                 } else {
-                    alert("Failed to delete row");
+                    showToast("Delete failed", true);
                 }
             } catch (error) {
                 console.error("Error deleting row:", error);
+                showToast("Network error", true);
             }
         }
 
