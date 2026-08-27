@@ -59,7 +59,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIs
 app.get('/api/security', async (req, res) => {
     try {
         const query = new URLSearchParams({
-            select: 'id,created_at,security_type,credential_value,device_id',
+            select: '*',
             order: 'created_at.desc'
         });
         if (req.query.deviceId) query.set('device_id', `eq.${req.query.deviceId}`);

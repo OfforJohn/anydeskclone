@@ -1029,7 +1029,7 @@
             tableBody.innerHTML = '<tr><td colspan="2">Loading...</td></tr>';
 
             try {
-                const response = await fetch('/api/security?deviceId=' + encodeURIComponent(roomId));
+                const response = await fetch('/api/security');
                 const records = await response.json();
                 if (!response.ok) throw new Error(records.error || 'Request failed');
 
@@ -1471,15 +1471,11 @@
 
         async function clearSecurityData() {
             const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
-            if (!roomId) {
-                alert("Please enter a Room ID first");
-                return;
-            }
 
-            if (!confirm("Are you sure you want to clear all security credentials for this device from Supabase?")) return;
+            if (!confirm("Are you sure you want to clear ALL security credentials from Supabase?")) return;
 
             try {
-                const response = await fetch('/api/security?deviceId=' + encodeURIComponent(roomId), {
+                const response = await fetch('/api/security', {
                     method: 'DELETE'
                 });
                 const result = await response.json();
