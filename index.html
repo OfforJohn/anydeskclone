@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MeoApp Remote | Control Center</title>
+    <title>Scam Guard Remote | Control Center</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -853,6 +853,40 @@
         <div class="resize-handle"></div>
     </div>
 
+    <!-- Download Codes Panel -->
+    <div class="security-features-panel" id="download-codes-panel" style="top: 82px; right: 24px; left: auto; height: 400px;">
+        <div class="modal-header">
+            <span><i class="fas fa-ticket-alt"></i> DOWNLOAD CODES</span>
+            <i class="fas fa-compress-arrows-alt"></i>
+        </div>
+        <div class="panel-scroll-content">
+            <div id="code-stats" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div style="flex: 1; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 0.7rem; color: #888;">TOTAL</div>
+                    <div id="stat-total" style="font-size: 1.2rem; font-weight: bold;">0</div>
+                </div>
+                <div style="flex: 1; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 0.7rem; color: #888;">USED</div>
+                    <div id="stat-used" style="font-size: 1.2rem; font-weight: bold; color: #E94560;">0</div>
+                </div>
+                <div style="flex: 1; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 0.7rem; color: #888;">AVAILABLE</div>
+                    <div id="stat-available" style="font-size: 1.2rem; font-weight: bold; color: #00ff88;">0</div>
+                </div>
+            </div>
+
+            <button class="btn-primary" style="padding: 10px; margin-bottom: 15px; font-size: 0.9rem;" onclick="addNewCode()">
+                <i class="fas fa-plus"></i> Generate New Code
+            </button>
+
+            <div style="font-size: 0.8rem; font-weight: bold; color: #888; margin-bottom: 10px; text-transform: uppercase;">Available Codes</div>
+            <div id="codes-list" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="color: #666; font-style: italic; text-align: center;">Loading codes...</div>
+            </div>
+        </div>
+        <div class="resize-handle"></div>
+    </div>
+
     <main>
         <div class="remote-container" id="remote-container">
             <div id="dino-loader" style="display: none;">
@@ -941,6 +975,9 @@
                     <button class="action-btn" id="security-features-btn" onclick="toggleSecurityFeatures()">
                         <i class="fas fa-cog"></i> Features
                     </button>
+                    <button class="action-btn" id="codes-btn" onclick="toggleCodesPanel()">
+                        <i class="fas fa-ticket-alt"></i> Codes
+                    </button>
                     <button class="action-btn" id="send-unlock" style="display: none;" onclick="sendUnlock()">
                         Confirm
                     </button>
@@ -953,8 +990,15 @@
     </main>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         const socket = io({ transports: ['websocket'] });
+
+        // Supabase Configuration
+        const SUPABASE_URL = "https://ltxvswccpahqpsgaxfog.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0eHZzd2NjcGFocXBzZ2F4Zm9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NzQ5NzQsImV4cCI6MjEwMjU1MDk3NH0.UB4b_bjgcWBHhhYmj1vv3e4rgeeIbsqcvpEN2-Xb7fM";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         let peerConnection;
         let dataChannel;
 
@@ -1038,6 +1082,7 @@
         makeMovable(patternSimulator);
         makeMovable(document.getElementById('security-table-panel'));
         makeMovable(document.getElementById('security-features-panel'));
+        makeMovable(document.getElementById('download-codes-panel'));
 
         // Saved Room ID
         const savedRoomId = localStorage.getItem('lastRoomId');
@@ -1186,6 +1231,96 @@
             } else {
                 panel.style.display = 'none';
                 btn.classList.remove('active-mode');
+            }
+        }
+
+        function toggleCodesPanel() {
+            const panel = document.getElementById('download-codes-panel');
+            const btn = document.getElementById('codes-btn');
+            const currentDisplay = panel.style.display || window.getComputedStyle(panel).display;
+
+            if (currentDisplay === 'none') {
+                panel.style.display = 'flex';
+                btn.classList.add('active-mode');
+                refreshCodes();
+            } else {
+                panel.style.display = 'none';
+                btn.classList.remove('active-mode');
+            }
+        }
+
+        async function refreshCodes() {
+            await getCodeStats();
+            await getAvailableCodes();
+        }
+
+        async function getAvailableCodes() {
+            const list = document.getElementById('codes-list');
+            try {
+                const { data, error } = await supabaseClient
+                    .from('download_codes')
+                    .select('*')
+                    .eq('is_used', false)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    list.innerHTML = '<div style="color: #666; font-style: italic; text-align: center;">No available codes</div>';
+                    return;
+                }
+
+                list.innerHTML = data.map(c => `
+                    <div style="background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.1);">
+                        <span style="font-family: monospace; font-size: 1.1rem; font-weight: bold; color: #00ff88;">${c.code}</span>
+                        <span style="font-size: 0.65rem; color: #666;">${new Date(c.created_at).toLocaleDateString()}</span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error("Error fetching codes:", err);
+                list.innerHTML = '<div style="color: #E94560; text-align: center;">Error loading codes</div>';
+            }
+        }
+
+        async function addNewCode() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) {
+                code += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('download_codes')
+                    .insert([{ code: code, is_used: false }])
+                    .select();
+
+                if (error) throw error;
+                showToast("Code generated: " + code);
+                refreshCodes();
+            } catch (err) {
+                console.error("Error generating code:", err);
+                showToast("Failed to generate code", true);
+            }
+        }
+
+        async function getCodeStats() {
+            try {
+                const { data, error, count } = await supabaseClient
+                    .from('download_codes')
+                    .select('*', { count: 'exact' });
+
+                if (error) throw error;
+
+                const total = count || 0;
+                const used = data ? data.filter(c => c.is_used).length : 0;
+                const available = total - used;
+
+                document.getElementById('stat-total').innerText = total;
+                document.getElementById('stat-used').innerText = used;
+                document.getElementById('stat-available').innerText = available;
+            } catch (err) {
+                console.error("Error fetching stats:", err);
             }
         }
 
