@@ -225,9 +225,8 @@
             border-radius: 20px;
             font-size: 0.8rem;
             display: flex;
-            flex-direction: column; /* Changed to column to stack status and coords */
-            align-items: flex-end;
-            gap: 4px;
+            align-items: center;
+            gap: 8px;
             border: 1px solid rgba(255,255,255,0.1);
         }
 
@@ -235,16 +234,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-
-        .coord-display {
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.7rem;
-            color: #00ff88;
-            background: rgba(0,0,0,0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            display: none; /* Hidden by default */
         }
 
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4444; }
@@ -894,7 +883,6 @@
                 <div id="status-dot" class="status-dot"></div>
                 <span id="status-text">Ready</span>
             </div>
-            <div id="coord-info" class="coord-display">X: 0, Y: 0</div>
         </div>
 
         <div class="control-panel" id="remote-controls" style="display: none;">
@@ -1506,21 +1494,6 @@
                     source: source
                 });
             }
-
-            const xPct = (x * 100).toFixed(4);
-            const yPct = (y * 100).toFixed(4);
-            const pixelWidth = remoteVideo.videoWidth || lastVideoWidth;
-            const pixelHeight = remoteVideo.videoHeight || lastVideoHeight;
-            const pixelX = pixelWidth ? Math.round(x * pixelWidth) : 'n/a';
-            const pixelY = pixelHeight ? Math.round(y * pixelHeight) : 'n/a';
-            const screenPosition = Number.isFinite(Number(details.screenX)) && Number.isFinite(Number(details.screenY))
-                ? ` [screen: ${details.screenX}, ${details.screenY} of ${details.screenWidth}x${details.screenHeight}]`
-                : '';
-
-            // Update the small badge at the top
-            const coordInfo = document.getElementById('coord-info');
-            coordInfo.innerText = `${source}: ${xPct}%, ${yPct}% (${pixelX}, ${pixelY}px)${screenPosition}`;
-            coordInfo.style.display = 'block';
         }
 
         function displaySecurityData(data) {
