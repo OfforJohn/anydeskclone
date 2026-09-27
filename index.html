@@ -1395,9 +1395,67 @@
             createPeerConnection(roomId, true);
         }
 
+        let pendingCandidates = [];
+        let reconnectTimeout = null;
+
+        function autoReconnectPeer() {
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(() => {
+                const roomId = roomIdInput.value || localStorage.getItem('lastRoomId');
+                if (roomId) {
+                    console.log("Auto-reconnecting PeerConnection...");
+                    if (peerConnection) {
+                        try { peerConnection.close(); } catch(e){}
+                    }
+                    peerConnection = null;
+                    dataChannel = null;
+                    createPeerConnection(roomId, true);
+                }
+            }, 1200);
+        }
+
+        async function processPendingCandidates() {
+            if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                while (pendingCandidates.length > 0) {
+                    const cand = pendingCandidates.shift();
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+                    } catch (e) {
+                        console.warn("Error adding queued candidate:", e);
+                    }
+                }
+            }
+        }
+
         async function createPeerConnection(roomId, isOfferer = false) {
             if (peerConnection) return;
-            const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+            const config = {
+                iceServers: [
+                    { urls: "stun:stun.l.google.com:19302" },
+                    { urls: "stun:stun.relay.metered.ca:80" },
+                    {
+                        urls: "turn:global.relay.metered.ca:80",
+                        username: "34833bb06b286b22f6474760",
+                        credential: "uT2D7UTml/31g90E"
+                    },
+                    {
+                        urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                        username: "34833bb06b286b22f6474760",
+                        credential: "uT2D7UTml/31g90E"
+                    },
+                    {
+                        urls: "turn:global.relay.metered.ca:443",
+                        username: "34833bb06b286b22f6474760",
+                        credential: "uT2D7UTml/31g90E"
+                    },
+                    {
+                        urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                        username: "34833bb06b286b22f6474760",
+                        credential: "uT2D7UTml/31g90E"
+                    }
+                ],
+                iceCandidatePoolSize: 10
+            };
             peerConnection = new RTCPeerConnection(config);
 
             peerConnection.onicecandidate = (event) => {
@@ -1405,10 +1463,19 @@
             };
 
             peerConnection.onconnectionstatechange = () => {
-                if (['failed', 'disconnected', 'closed'].includes(peerConnection.connectionState)) {
-                    updateStatus("Connection lost", false);
+                console.log("PeerConnection state:", peerConnection.connectionState);
+                if (['failed', 'disconnected'].includes(peerConnection.connectionState)) {
+                    updateStatus("Reconnecting...", false);
                     remoteVideo.style.display = 'none';
                     dinoLoader.style.display = 'flex';
+                    autoReconnectPeer();
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log("ICE Connection state:", peerConnection.iceConnectionState);
+                if (['failed', 'disconnected'].includes(peerConnection.iceConnectionState)) {
+                    autoReconnectPeer();
                 }
             };
 
@@ -1437,12 +1504,17 @@
 
         function setupDataChannel(channel) {
             channel.onopen = () => {
+                if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
                 updateStatus("Live Control", true);
                 console.log("Data Channel: OPEN");
             };
             channel.onclose = () => {
-                updateStatus("Control Lost (Channel Closed)", false);
                 console.log("Data Channel: CLOSED");
+                updateStatus("Reconnecting control...", false);
+                autoReconnectPeer();
+            };
+            channel.onerror = (err) => {
+                console.warn("DataChannel error:", err);
             };
             channel.onmessage = (event) => {
                 try {
@@ -1579,16 +1651,28 @@
         }
 
         socket.on("message", async (data) => {
-            if (data.offer) {
-                if (!peerConnection) await createPeerConnection(data.roomId);
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                socket.emit("message", { roomId: data.roomId, answer });
-            } else if (data.answer) {
-                if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-            } else if (data.candidate && peerConnection) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            try {
+                if (data.offer) {
+                    if (!peerConnection) await createPeerConnection(data.roomId);
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    await processPendingCandidates();
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.emit("message", { roomId: data.roomId, answer });
+                } else if (data.answer) {
+                    if (peerConnection) {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        await processPendingCandidates();
+                    }
+                } else if (data.candidate) {
+                    if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } else {
+                        pendingCandidates.push(data.candidate);
+                    }
+                }
+            } catch (err) {
+                console.error("Error in signaling message handler:", err);
             }
         });
 
